@@ -62,7 +62,8 @@
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
-iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {  
+iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
+  cl <- match.call(expand.dots = TRUE)
   mf <- match.call(expand.dots = FALSE)
 
   m <- match(
@@ -97,6 +98,8 @@ iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
   D <- model.matrix(mt_d, mf)
   Z <- model.matrix(mt_z, mf)
   out <- iv_gmm_fit(Y, D, Z, max_iter = max_iter, tol = tol)
+  out$call <- cl
+  out$df.residual <- nrow(D) - ncol(out$vcov)
   return(out)
 }
 
@@ -172,7 +175,7 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
   effs <- psi_to_tau(out$psi, out$rho, K, res_var)
   out$tau <- effs$tau
   out$tau_se <- effs$tau_se
-  names(out$tau) <- names(out$tau_se) <- colnames(D)
+  names(out$tau) <- names(out$tau_se) <- colnames(d)
   out$tau_se[out$tau_se == 0] <- NA
   class(out) <- "iv_factorial"
   return(out)
@@ -299,8 +302,43 @@ psi_to_tau <- function(psi, rho, K, vcv) {
   cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2^(K-1)
   brho_names <- sapply(strsplit(names(psi), "_"), function(x) x[2])
   all_c <- which(brho_names == paste0(rep("c", K), collapse = ""))
-  mains <- t(cons) %*% psi[all_c]
-  mains_vcv <- t(cons) %*% vcv[all_c + length(rho), all_c + lenght(rho)] %*% as.matrix(cons)
+  mains <- c(t(cons) %*% psi[all_c])
+  rho_len <- length(rho) - 1
+  mains_vcv <- t(cons) %*% vcv[all_c + rho_len, all_c + rho_len] %*% as.matrix(cons)
   mains_se <- sqrt(diag(mains_vcv))
   return(list(tau = mains, tau_se = mains_se))
+}
+
+#' @export
+print.iv_factorial <- function(x, ...) {
+  cat("\nCall:\n")
+  print(x$call)
+
+  cat("\nMain effects:\n")
+  print(x$tau)
+  cat("\n")
+  invisible(x)
+}
+
+#' @export
+summary.iv_factorial <- function(object, ...) {
+  rdf <- object$df.residual
+  tval <- object$tau / object$tau_se
+  pval <- 2 * pt(abs(tval), rdf, lower.tail = FALSE)
+  out <- object[c("call", "terms", "vcov")]
+  out$coefficients <- cbind(object$tau, object$tau_se, tval, pval)
+  out$c_prob <- object$rho[length(object$rho)]
+  out$c_prob_se <- sqrt(out$vcov[length(object$rho) - 1, length(object$rho) - 1])
+  class(out) <- "summary.iv_factorial"
+  out
+}
+
+#' @export
+print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
+  cat("\n Main effects among joint compliers:\n")
+  stats::printCoefmat(x$coefficients, digits = digits)
+  cat("\nEstimated prob. of joint compliers: ",
+      formatC(x$c_prob, digits), "\tSE = ", formatC(x$c_prob_se, digits))
+  cat("\n")
+  invisible(x)
 }
