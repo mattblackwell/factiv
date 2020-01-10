@@ -143,24 +143,29 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
   N <- length(y)
   K <- dim(d)[2]
   inits <- iv_init(y, d, z)
+  A <- inits$A
+  B <- inits$B
   dat <- cbind(d, z, y)
-  W0 <- diag(nrow = nrow(inits$A) + nrow(inits$B))
-  start <- c(inits$rho[-1], inits$psi)
+  W0 <- diag(nrow = nrow(A) + nrow(B))
+  start <- c(inits$rho[!is.na(inits$rho)][-1],
+             inits$psi[!is.na(inits$psi)])
   first <- optim(par = start,
                  fn = iv_g_loss, gr = iv_grad,
                  x = dat, W = W0, Z = inits$Ztilde, D = inits$Dtilde,
-                 A = inits$A, B = inits$B, method = "BFGS")
+                 A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid,
+                 method = "BFGS")
   res <- first$par
   delt <- 1000
   count <- 0
   while (count <= max_iter & delt > tol) {
     ghat <- iv_g(res, x = dat, W = W0, Z = inits$Ztilde, D = inits$Dtilde,
-                 A = inits$A, B = inits$B)$moments
+                 A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)$moments
     Lhat <- (1 / N) * t(ghat) %*% ghat
     second <- optim(par = start,
                  fn = iv_g_loss, gr = iv_grad,
                  x = dat, W = solve(Lhat), Z = inits$Ztilde, D = inits$Dtilde,
-                 A = inits$A, B = inits$B, method = "BFGS")
+                 A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid,
+                 method = "BFGS")
     delt <- sum(abs(res - second$par) / res)
     res <- second$par
     count <- count + 1
@@ -169,19 +174,22 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
     warning("Reached maximum iterations without converging...\n")
   }
   Ghat <- (1 / N) * iv_g(res, x = dat, W = W0, Z = inits$Ztilde,
-                         D = inits$Dtilde, A = inits$A, B = inits$B)$Ghat
+                         D = inits$Dtilde, A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)$Ghat
   res_var <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+  rho_params <- res[1:(sum(!is.na(inits$rho)) - 1)]
+  
   out <- list()
-  names(res) <- c(colnames(inits$A)[-1], colnames(inits$B))
-  out$rho <- c(1 - sum(res[colnames(inits$A)[-1]]), res[colnames(inits$A)[-1]])
-  names(out$rho)[1] <- colnames(inits$A)[1]
-  out$psi <- res[colnames(inits$B)]
+  out$rho <- inits$rho
+  out$rho[colnames(A)[-1]] <- rho_params
+  out$rho[colnames(A)[1]] <- 1 - sum(rho_params)
+  out$psi <- inits$psi
+  out$psi[colnames(B)] <- res[colnames(B)]
   colnames(res_var) <- names(res)
   rownames(res_var) <- names(res)
   out$vcov <- res_var
   out$init <- inits
   
-  effs <- psi_to_tau(out$psi, out$rho, K, res_var)
+  effs <- psi_to_tau(out$psi, K, res_var)
   out$tau <- effs$tau
   out$tau_se <- effs$tau_se
   names(out$tau) <- names(out$tau_se) <- colnames(d)
@@ -236,46 +244,64 @@ iv_init <- function(y, d, z) {
     colnames(B)[d_grid_str == this_str] <- paste0(this_str, "_", s_names)
   }
 
-  A1 <- A[,-1]
-  f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
+
   rho <- rep(NA, times = nrow(ps_grid))
-  rho[-1] <- solve(t(A1)%*%A1) %*% t(A1) %*% f_dz
-  rho[1] <- 1 - sum(rho[-1])
+  names(rho) <- colnames(A)
+  psi <- rep(NA, times = ncol(B))
+  names(psi) <- colnames(B)
+
+  f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
+  B_valid <- which(f_dz > 0)
+  A_valid <- which(f_dz > 0 & f_dz < 1)
+  rho_valid <- which(colSums(A[f_dz == 0, ]) == 0)
+  A <- A[, rho_valid]
+  rho[rho_valid] <- solve(crossprod(A[A_valid,])) %*% t(A[A_valid,]) %*% f_dz[A_valid]
+
   S_dz <- colSums(Ztilde * y * Dtilde) / colSums(Ztilde)
 
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
-  brho_pos <- match(brho_names, do.call(paste0, ps_grid))
-  Bp <- B %*% diag(rho[brho_pos])
-  psi <- solve(t(Bp) %*% Bp) %*% t(Bp) %*% S_dz
+  brho_pos <- match(brho_names, names(rho))
+  psi_valid <- brho_pos %in% rho_valid
+  B <- B[B_valid, psi_valid]
+  Bp <- B %*% diag(rho[brho_pos[psi_valid]])
+  psi[psi_valid] <- solve(crossprod(Bp)) %*% t(Bp) %*% S_dz[B_valid]
 
-  ## dropping redundant conditions in rho
-  drops <- seq(from = 2^K, to = ncol(Ztilde), by = 2^K)
-  A <- A[-drops,]
-  return(list(A = A, B = B, Ztilde = Ztilde, Dtilde = Dtilde, rho = rho, psi = psi))
+  ## dropping one row of A per combination of Z since they sum to 1
+  ## we don't do this above because it creates inversion issues
+  ## when trying to get the initial rho estimates
+  A_valid <- A_valid[duplicated(z_grid[A_valid, ])]
+  A <- A[A_valid, ]
+  return(list(A = A, B = B, Ztilde = Ztilde, Dtilde = Dtilde,
+              A_valid = A_valid, B_valid = B_valid,
+              rho = rho, psi = psi))
 }
 
-iv_g <- function(theta, x, W, Z, D, A, B) {
+iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
 
   N <- nrow(Z)
   K <- (dim(x)[2] - 1) / 2 ## probably shouldn't hard code this data
-  ## structure
-  drops <- seq(from = 2^K, to = ncol(Z), by = 2^K)
+  dz_vals <- rep(list(c(1, 0)), 2 * K)
+  d_grid <- expand.grid(dz_vals)[, 1:K]
+  z_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
 
-  ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
-  names(theta) <- c(colnames(A)[-1], colnames(B))
+  ## structure
+  ## drops <- seq(from = 2^K, to = ncol(Z), by = 2^K)
+  
   rho <- c(1 - sum(theta[colnames(A)[-1]]), theta[colnames(A)[-1]])
   names(rho)[1] <- colnames(A)[1]
   psi <- theta[colnames(B)]
   y <- x[, 5]
-  
+
+  ## remove one A constraint per Z combination
   Arho <- matrix(A %*% rho, nrow = N, ncol = nrow(A), byrow = TRUE)
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
-  brho_pos <- match(brho_names, do.call(paste0, ps_grid))
+  brho_pos <- match(brho_names, colnames(A))
   Bp <- B %*% diag(rho[brho_pos])
-  Bppsi <- matrix(Bp %*% psi, nrow = N, ncol = ncol(Z), byrow = TRUE)
+  Bppsi <- matrix(Bp %*% psi, nrow = N, ncol = nrow(B), byrow = TRUE)
 
   ## drops are redundant orthogonality conditions
-  moments <- cbind(Z[,-drops] * (D[,-drops] - Arho), Z * (y * D - Bppsi))
+  moments <- cbind(Z[, A_valid] * (D[, A_valid] - Arho),
+                   Z[, B_valid] * (y * D[, B_valid] - Bppsi))
 
   
   
@@ -284,15 +310,15 @@ iv_g <- function(theta, x, W, Z, D, A, B) {
 
   Zbar <- colSums(Z)
   rho_psi <- matrix(NA, nrow = nrow(B), ncol = ncol(A) - 1)
-  for (j in 2:nrow(ps_grid)) {
+  for (j in 2:ncol(A)) {
     Bscreen <- diag(1 * (brho_pos == j))
     Bscreen[1,1] <- -1
-    rho_psi[,j-1] <- -Zbar * (B %*% Bscreen %*% psi)
+    rho_psi[,j-1] <- -Zbar[B_valid] * (B %*% Bscreen %*% psi)
   }
   A1 <- A[,-1] + -1 * A[,1]
-  rho_grad <- cbind(-Zbar[-drops] * A1,
+  rho_grad <- cbind(-Zbar[A_valid] * A1,
                     matrix(0, nrow = nrow(A), ncol = ncol(B)))
-  psi_grad <- cbind(rho_psi, -Zbar * Bp)
+  psi_grad <- cbind(rho_psi, -Zbar[B_valid] * Bp)
   Ghat <- rbind(rho_grad, psi_grad)
   Qgrad <- -crossprod(Ghat, W %*% ghats)
   
@@ -307,13 +333,11 @@ iv_g_loss <- function(...) {
   iv_g(...)$loss
 }
 
-psi_to_tau <- function(psi, rho, K, vcv) {
+psi_to_tau <- function(psi, K, vcv) {
   cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2^(K-1)
-  brho_names <- sapply(strsplit(names(psi), "_"), function(x) x[2])
-  all_c <- which(brho_names == paste0(rep("c", K), collapse = ""))
+  all_c <- grep(paste0(rep("c", K), collapse = ""), names(psi), value = TRUE)
   mains <- c(t(cons) %*% psi[all_c])
-  rho_len <- length(rho) - 1
-  mains_vcv <- t(cons) %*% vcv[all_c + rho_len, all_c + rho_len] %*% as.matrix(cons)
+  mains_vcv <- t(cons) %*% vcv[all_c, all_c] %*% as.matrix(cons)
   mains_se <- sqrt(diag(mains_vcv))
   return(list(tau = mains, tau_se = mains_se))
 }
