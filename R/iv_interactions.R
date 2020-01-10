@@ -59,6 +59,15 @@
 ##'
 ##' Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
 ##'   Factorial Experiments." Working paper.
+##'
+##' @examples
+##' data(newhaven)
+##'
+##' out <- iv_factorial(turnout_98 ~ inperson + phone | inperson_rand
+##'   + phone_rand, data = newhaven)
+##'
+##' summary(out)
+##' 
 ##' @export
 ##' @importFrom stats model.matrix model.response
 

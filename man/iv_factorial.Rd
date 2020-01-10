@@ -54,7 +54,7 @@ to  estimate both the proportions of each compliance class (also
 known as principal strata) and the average potential outcomes
 within those classes. It also provides estimates of several
 one-way, joint, and interactive treatment effects within these
-classes.
+classes. 
 
 Under the above assumptions, the compliance classes are the
 product of the compliance classes for each treatment-instrument
@@ -65,6 +65,15 @@ with the first treatment and always take the second treatment, and
 treatment and never take the second treatment. Finally, note that
 treatment effects are only well-defined for compliance classes for
 which there is compliance on at least one treatment.
+}
+\examples{
+data(newhaven)
+
+out <- iv_factorial(turnout_98 ~ inperson + phone | inperson_rand
+  + phone_rand, data = newhaven)
+
+summary(out)
+
 }
 \references{
 Matthew Blackwell (2017) Instrumental Variable Methods
