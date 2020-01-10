@@ -305,7 +305,7 @@ iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
 
   
   
-  ghats <- colMeans(moments)
+  ghats <- colMeans(moments)  
   loss <- crossprod(ghats, W %*% ghats)
 
   Zbar <- colSums(Z)
@@ -320,7 +320,7 @@ iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
                     matrix(0, nrow = nrow(A), ncol = ncol(B)))
   psi_grad <- cbind(rho_psi, -Zbar[B_valid] * Bp)
   Ghat <- rbind(rho_grad, psi_grad)
-  Qgrad <- -crossprod(Ghat, W %*% ghats)
+  Qgrad <- crossprod(Ghat, W %*% ghats)
   
   return(list(moments = moments, loss = loss, grad = Qgrad, Ghat = Ghat))
 }

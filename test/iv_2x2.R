@@ -1,4 +1,5 @@
-library(factorialIV)
+library(factiv)
+set.seed(2140)
 cc.prob <- 0.4
 cprobs <- c(cc.prob, rep((1-cc.prob)/8, 8))
 N <- 1000
