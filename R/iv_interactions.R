@@ -361,7 +361,8 @@ summary.iv_factorial <- function(object, ...) {
   out <- object[c("call", "terms", "vcov")]
   out$coefficients <- cbind(object$tau, object$tau_se, tval, pval)
   out$c_prob <- object$rho[length(object$rho)]
-  out$c_prob_se <- sqrt(out$vcov[length(object$rho) - 1, length(object$rho) - 1])
+  c_pos <- sum(!is.na(object$rho)) - 1
+  out$c_prob_se <- sqrt(out$vcov[c_pos, c_pos])
   class(out) <- "summary.iv_factorial"
   out
 }
