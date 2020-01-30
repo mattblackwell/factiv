@@ -16,7 +16,13 @@
 ##'   with each treatment variable. The order of the variables in the
 ##'   formula must match. 
 ##' @param data a data.frame on which to apply the \code{formula}.
-##' @param level the confidence level required. 
+##' @param ways the highest degree of interaction effect to estimate. 
+##' @param level the confidence level required.
+##' @param joint_compliers a logical indicating if all of the
+##'   estimated effects should be calculated for compliers on all
+##'   factors. By default, this is \code{FALSE} and the each factorial
+##'   effect is estimated among the compliers for the factors in that
+##'   effect.  
 ##' @return A list of class \code{iv_finite_factorial} that contains the following
 ##'   components: 
 ##' \item{tau}{a vector of estimated effect ratios for each factor.}
@@ -41,14 +47,21 @@
 ##' data(newhaven)
 ##'
 ##' out <- iv_finite_factorial(turnout_98 ~ inperson + phone | inperson_rand
-##'   + phone_rand, data = newhaven)
+##'   + phone_rand, data = newhaven, ways = 2)
 ##'
 ##' out
+##'
+##' joint <- iv_finite_factorial(turnout_98 ~ inperson + phone |
+##'   inperson_rand + phone_rand, data = newhaven, ways = 2,
+##'   joint_compliers = TRUE)
+##'
+##' joint
 ##' 
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
-iv_finite_factorial <- function(formula, data, subset, level = 0.95) {
+iv_finite_factorial <- function(formula, data, subset, ways = 1, level = 0.95,
+                                joint_compliers = FALSE) {
   cl <- match.call(expand.dots = TRUE)
   mf <- match.call(expand.dots = FALSE)
 
@@ -83,56 +96,115 @@ iv_finite_factorial <- function(formula, data, subset, level = 0.95) {
   Y <- model.response(mf, "numeric")
   D <- model.matrix(mt_d, mf)
   Z <- model.matrix(mt_z, mf)
-  out <- iv_finite_fit(Y, D, Z, level = level)
+  out <- iv_finite_fit(Y, D, Z, level = level, ways = ways,
+                       joint_compliers = joint_compliers)
   out$call <- cl
   out$terms <- mt
   class(out) <- "iv_finite_factorial"
   return(out)
 }
 
-iv_finite_fit <- function(y, d, z, level = 0.95) {
+iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRUE) {
   K <- dim(z)[2]
   N <- length(y)
-  contr_grid <- expand.grid(rep(list(c(1, -1)), times = K)) / 2 ^ (K - 1)
+
+  dz_vals <- rep(list(c(1, 0)), 2 * K)
+  dd_grid <- expand.grid(dz_vals)[, 1:K]
+  zz_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
+  zz_str_grid <- do.call(paste0, zz_grid)
+  ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
+  ps_type <- 2 + zz_grid - dd_grid + 2 * dd_grid * zz_grid
+  ps_dict <- list("a", c("n", "c"), "n", c("a", "c"))
+
+  g <- expand.grid(rep(list(c(1, -1)), times = K))
+  colnames(g) <- colnames(z)
+  J <- nrow(g)
+  n_eff <- sum(choose(K, 1:ways))
+  V <- matrix(0, ncol = 3 ^ K, nrow = K)
+  colnames(V) <-  do.call(paste0, ps_grid)
+  all_comps <- which(rowSums(ps_grid == rep("c", K)) == K)
+  for (k in 1:K) {
+    if (!joint_compliers) {
+      cvec <- which(ps_grid[, k] == "c")
+      V[k, cvec] <- 1
+    } else {
+      V[k, all_comps] <- 1
+    }
+  }
+  if (ways > 1) {
+    for (k in 2:ways) {
+      combs <- combn(1:K, k)
+      contr_int <- matrix(NA, nrow = J, ncol = ncol(combs))
+      colnames(contr_int) <- rep("", ncol(combs))
+      Vk <- matrix(0, nrow = ncol(combs), ncol = 3 ^ K)
+      for (j in 1:ncol(combs)) {
+        this_comb <- g[, combs[, j], drop = FALSE]
+        contr_int[, j] <- apply(this_comb, 1, prod)
+        colnames(contr_int)[j] <- paste0(colnames(z)[combs[, j]],
+                                         collapse = ":")
+        if (!joint_compliers) {
+          fact_comps <- rowSums(ps_grid[, combs[, j]] == rep("c", k)) == k
+          Vk[j, fact_comps] <- 1
+        } else {
+          Vk[j, all_comps] <- 1
+        }
+        
+      }
+      g <- cbind(g, contr_int)
+      V <- rbind(V, Vk)
+    }
+  }
+  g <- g / 2 ^ (K - 1)
+
+  A <- matrix(1, nrow = nrow(dd_grid), ncol = nrow(ps_grid))
+  for (k in 1:K) {
+    k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
+    A <- A * t(k_mat)
+  }
+  colnames(A) <- do.call(paste0, ps_grid)
+  Aw <- V %*% solve(crossprod(A)) %*% t(A)
+
   z_grid <- expand.grid(rep(list(c(1, 0)), times = K))
-  J <- nrow(z_grid)
   z_grid_str <- do.call(paste0, z_grid)
   z_str <- apply(z, 1, paste0, collapse = "")
 
-  # Create science matrices -----------------------------
-  Ztilde <- matrix(0, nrow = N, ncol = J)
-  Dtilde <- matrix(0, nrow = N, ncol = K * J)
+  d_grid <- expand.grid(rep(list(c(1, 0)), times = K))
+  d_grid_str <- do.call(paste0, d_grid)
+  d_str <- apply(d, 1, paste0, collapse = "")
+  Dtilde <- matrix(0, nrow = N, ncol = J)
   for (j in 1:J) {
-    Dcols <- seq(j, K * J, by = J)
-    Ztilde[z_str == z_grid_str[j], j] <- 1
-    Dtilde[z_str == z_grid_str[j], Dcols] <- d[z_str == z_grid_str[j], ]
+    Dtilde[d_str == d_grid_str[j], j] <- 1
   }
-  Ytilde <- Ztilde * y
+  
+  s_z <- array(NA, dim = c(J + 1, J + 1, J))
+  Ybar <- rep(NA, times = J)
+  Dbar <- matrix(NA, nrow = J, ncol = J)
+  Q_z <- array(0, dim = c(ncol(g) + nrow(V), J + 1, J))
+  vcv <- matrix(0, ncol = ncol(g) + nrow(V), nrow = ncol(g) + nrow(V))
+  for (j in 1:J) {
+    jj <- which(z_str == z_grid_str[j])
+    Ybar[j] <- mean(y[jj])
+    Dbar[, j] <- colMeans(Dtilde[jj, ])
+    s_z[,, j] <- var(cbind(y[jj], Dtilde[jj, ]))
+    this_A <- Aw[, which(zz_str_grid == z_grid_str[j])]
+    Q_z[1:ncol(g), 1, j] <- unlist(g[j, ])
+    Q_z[1:ncol(g), -1, j] <- 0
+    Q_z[(ncol(g) + 1):dim(Q_z)[1], 1, j] <- 0
+    Q_z[(ncol(g) + 1):dim(Q_z)[1], -1, j] <- this_A
+    vcv <- vcv + (1 / length(jj)) * (Q_z[,, j] %*% s_z[,, j] %*% t(Q_z[,, j]))
+  }
+  # Create science matrices -----------------------------
 
-  Ybar <- colSums(Ytilde) / colSums(Ztilde)
-  Dbar <- matrix(colSums(Dtilde) / colSums(Ztilde), nrow = J, ncol = K)
-
-  tau_y <- t(contr_grid) %*% Ybar
-  tau_d <- diag(t(contr_grid) %*% Dbar)
+  tau_y <- t(g) %*% Ybar
+  tau_d <- Aw %*% c(Dbar)
 
   tau <- tau_y / tau_d
-  r <- N / 2 ^ K
-  Ynorm <- Ztilde * sweep(Ytilde, 2, Ybar)
-  s_y <- colSums(Ynorm ^ 2) / (colSums(Ztilde) - 1)
-  s_d <- matrix(NA, nrow = J, ncol = K)
-  c_yd <-  matrix(NA, nrow = J, ncol = K)
-  for (k in 1:K) {
-    cols <- 1:J + J * (k - 1)
-    Dnorm <- Ztilde * sweep(Dtilde[, cols], 2, Dbar[, k])
-    s_d[, k] <- colSums(Dnorm ^ 2) / (colSums(Ztilde) - 1)
-    c_yd[, k] <- colSums(Ynorm * Dnorm) / (colSums(Ztilde) - 1)
-  }
-
-  v_tau_y <- t(contr_grid ^ 2 / r) %*% s_y
-  v_tau_d <- diag(t(contr_grid ^ 2 / r) %*% s_d)
-  c_tau_yd <- diag(t(contr_grid ^ 2 / r) %*% c_yd)
-  names(tau) <- names(tau_y) <- names(tau_d) <- colnames(z)
-  names(v_tau_y) <- names(v_tau_d) <- names(c_tau_yd) <- colnames(z)
+  
+  v_tau_y <- diag(vcv)[1:n_eff]
+  v_tau_d <- diag(vcv)[n_eff + (1:n_eff)]
+  c_tau_yd <- diag(vcv[1:n_eff, n_eff + (1:n_eff)])
+  names(tau) <- names(tau_y) <- names(tau_d) <- colnames(g)
+  names(v_tau_y) <- names(v_tau_d) <- names(c_tau_yd) <- colnames(g)
   
   alpha <- (1 - level) / 2
   qq <- qnorm(alpha)
@@ -150,14 +222,14 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   moe <- rep(NA, K)
   moe[deter > 0] <- sqrt(deter[deter > 0]) / (2 * aa[deter > 0])
   cntr <- bb / (-2 * aa)
-  tau_cis <- matrix(NA, nrow = K, ncol = 4)
+  tau_cis <- matrix(NA, nrow = n_eff, ncol = 4)
   tau_cis[closed, 1:2] <- cbind(cntr - moe, cntr + moe)[closed, ]
   tau_cis[infinite, 1] <- -Inf
   tau_cis[infinite, 2] <- Inf
   tau_cis[disjoint, 1] <- -Inf
   tau_cis[disjoint, 4] <- Inf
   tau_cis[disjoint, 2:3] <- cbind(cntr + moe, cntr - moe)[disjoint, ]
-  rownames(tau_cis) <- colnames(z)
+  rownames(tau_cis) <- names(tau)
   colnames(tau_cis) <- c("ci_1_lower", "ci_1_upper", "ci_2_lower", "ci_2_upper")
   return(list(tau = tau, tau_cis = tau_cis,
               tau_y = tau_y, v_tau_y = v_tau_y,
@@ -190,4 +262,43 @@ print.iv_finite_factorial <- function(x, ...) {
   print(out, quote = FALSE)
   cat("\n")
   invisible(x)
+}
+
+calculate_rho_hat <- function(d, z) {
+  K <- dim(d)[2]
+  N <- dim(d)[1]
+  
+  dz_vals <- rep(list(c(1, 0)), 2 * K)
+  ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
+  d_grid <- expand.grid(dz_vals)[, 1:K]
+  z_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
+  R <- nrow(z_grid)
+  
+  d_grid_str <- do.call(paste0, d_grid)
+  z_grid_str <- do.call(paste0, z_grid)
+  Dtilde <- matrix(0, nrow = N, ncol = R)
+  Ztilde <- matrix(0, nrow = N, ncol = R)
+  for (r in 1:R) {
+    Dtilde[d_str == d_grid_str[r], r] <- 1
+    Ztilde[z_str == z_grid_str[r], r] <- 1
+  }
+
+  d_grid <- expand.grid(rep(list(c(1,0)), times = k))
+  d_grid_str <- do.call(paste0, d_grid)
+  ps_type <- 2 + z_grid - d_grid + 2 * d_grid * z_grid
+  ps_dict <- list("a", c("n", "c"), "n", c("a", "c"))
+  A <- matrix(1, nrow = nrow(d_grid), ncol = nrow(ps_grid))
+  for (k in 1:K) {
+    k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
+    A <- A * t(k_mat)
+  }
+  colnames(A) <- do.call(paste0, ps_grid)
+  rownames(A) <- paste0(do.call(paste0, d_grid), "_", do.call(paste0, z_grid))
+  rho <- rep(NA, times = nrow(ps_grid))
+  names(rho) <- colnames(A)
+  f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
+  
+  Dnorm <- Ztilde * sweep(Dtilde, 2, f_dz)
+  s_dz <- colSums(Dorm ^ 2) / colSums(Ztilde)
+  return(list(est = f_dz, Ztilde = Ztilde, Dtilde = Dtilde, s_dz = s_dz))
 }

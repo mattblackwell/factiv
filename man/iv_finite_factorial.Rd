@@ -4,7 +4,14 @@
 \alias{iv_finite_factorial}
 \title{Finite-Sample IV Estimation of 2^K Factorial Design}
 \usage{
-iv_finite_factorial(formula, data, subset, level = 0.95)
+iv_finite_factorial(
+  formula,
+  data,
+  subset,
+  ways = 1,
+  level = 0.95,
+  joint_compliers = FALSE
+)
 }
 \arguments{
 \item{formula}{formula specification of the factorial design with
@@ -17,7 +24,15 @@ formula must match.}
 
 \item{data}{a data.frame on which to apply the \code{formula}.}
 
+\item{ways}{the highest degree of interaction effect to estimate.}
+
 \item{level}{the confidence level required.}
+
+\item{joint_compliers}{a logical indicating if all of the
+estimated effects should be calculated for compliers on all
+factors. By default, this is \code{FALSE} and the each factorial
+effect is estimated among the compliers for the factors in that
+effect.}
 }
 \value{
 A list of class \code{iv_finite_factorial} that contains the following
@@ -49,9 +64,15 @@ intervals.
 data(newhaven)
 
 out <- iv_finite_factorial(turnout_98 ~ inperson + phone | inperson_rand
-  + phone_rand, data = newhaven)
+  + phone_rand, data = newhaven, ways = 2)
 
 out
+
+joint <- iv_finite_factorial(turnout_98 ~ inperson + phone |
+  inperson_rand + phone_rand, data = newhaven, ways = 2,
+  joint_compliers = TRUE)
+
+joint
 
 }
 \references{
