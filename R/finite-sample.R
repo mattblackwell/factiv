@@ -60,8 +60,7 @@
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
-iv_finite_factorial <- function(formula, data, subset, ways = 1, level = 0.95,
-                                joint_compliers = FALSE) {
+iv_finite_factorial <- function(formula, data, subset, level = 0.95) {
   cl <- match.call(expand.dots = TRUE)
   mf <- match.call(expand.dots = FALSE)
 
@@ -96,18 +95,18 @@ iv_finite_factorial <- function(formula, data, subset, ways = 1, level = 0.95,
   Y <- model.response(mf, "numeric")
   D <- model.matrix(mt_d, mf)
   Z <- model.matrix(mt_z, mf)
-  out <- iv_finite_fit(Y, D, Z, level = level, ways = ways,
-                       joint_compliers = joint_compliers)
+  out <- iv_finite_fit(Y, D, Z, level = level)
   out$call <- cl
   out$terms <- mt
   class(out) <- "iv_finite_factorial"
   return(out)
 }
 
-iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRUE) {
+iv_finite_fit <- function(y, d, z, level = 0.95) {
   K <- dim(z)[2]
   N <- length(y)
-
+  ways <- K
+  
   dz_vals <- rep(list(c(1, 0)), 2 * K)
   dd_grid <- expand.grid(dz_vals)[, 1:K]
   zz_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
@@ -122,14 +121,9 @@ iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRU
   n_eff <- sum(choose(K, 1:ways))
   V <- matrix(0, ncol = 3 ^ K, nrow = K)
   colnames(V) <-  do.call(paste0, ps_grid)
-  all_comps <- which(rowSums(ps_grid == rep("c", K)) == K)
   for (k in 1:K) {
-    if (!joint_compliers) {
-      cvec <- which(ps_grid[, k] == "c")
-      V[k, cvec] <- 1
-    } else {
-      V[k, all_comps] <- 1
-    }
+    cvec <- which(ps_grid[, k] == "c")
+    V[k, cvec] <- 1
   }
   if (ways > 1) {
     for (k in 2:ways) {
@@ -142,20 +136,17 @@ iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRU
         contr_int[, j] <- apply(this_comb, 1, prod)
         colnames(contr_int)[j] <- paste0(colnames(z)[combs[, j]],
                                          collapse = ":")
-        if (!joint_compliers) {
-          fact_comps <- rowSums(ps_grid[, combs[, j]] == rep("c", k)) == k
-          Vk[j, fact_comps] <- 1
-        } else {
-          Vk[j, all_comps] <- 1
-        }
-        
+        fact_comps <- rowSums(ps_grid[, combs[, j]] == rep("c", k)) == k
+        Vk[j, fact_comps] <- 1        
       }
       g <- cbind(g, contr_int)
       V <- rbind(V, Vk)
     }
   }
+  g_J <- g[,n_eff]
+  G_J <- diag(g_J)
+  
   g <- g / 2 ^ (K - 1)
-
   A <- matrix(1, nrow = nrow(dd_grid), ncol = nrow(ps_grid))
   for (k in 1:K) {
     k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
@@ -171,47 +162,70 @@ iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRU
   d_grid <- expand.grid(rep(list(c(1, 0)), times = K))
   d_grid_str <- do.call(paste0, d_grid)
   d_str <- apply(d, 1, paste0, collapse = "")
-  Dtilde <- matrix(0, nrow = N, ncol = J)
+  R <- matrix(0, nrow = N, ncol = J)
   for (j in 1:J) {
-    Dtilde[d_str == d_grid_str[j], j] <- 1
+    R[d_str == d_grid_str[j], j] <- 1
   }
-  
-  s_z <- array(NA, dim = c(J + 1, J + 1, J))
-  Ybar <- rep(NA, times = J)
-  Dbar <- matrix(NA, nrow = J, ncol = J)
-  Q_z <- array(0, dim = c(ncol(g) + nrow(V), J + 1, J))
-  vcv <- matrix(0, ncol = ncol(g) + nrow(V), nrow = ncol(g) + nrow(V))
+
+  H <- y * R
+  s_z <- array(NA, dim = c(2 * J, 2 * J, J))
+  Hbar <- matrix(NA, nrow = J, ncol = J)
+  Rbar <- matrix(NA, nrow = J, ncol = J)
+  Q_z <- array(0, dim = c(3 * n_eff - 1, 2 * J, J))
+  vcv <- matrix(0, ncol = 3 * n_eff - 1, nrow = 3 * n_eff - 1)
+  theta <- rep(0, times = 3 * n_eff - 1)
+  t_ind <- 1:n_eff
+  tc_ind <- n_eff + 1:(n_eff - 1)
+  d_ind <- 2 * n_eff - 1 + 1:n_eff
+
   for (j in 1:J) {
     jj <- which(z_str == z_grid_str[j])
-    Ybar[j] <- mean(y[jj])
-    Dbar[, j] <- colMeans(Dtilde[jj, ])
-    s_z[,, j] <- var(cbind(y[jj], Dtilde[jj, ]))
+    Hbar[, j] <- colMeans(H[jj, ])
+    Rbar[, j] <- colMeans(R[jj, ])
+    s_z[,, j] <- var(cbind(H[jj, ], R[jj, ]))
     this_A <- Aw[, which(zz_str_grid == z_grid_str[j])]
-    Q_z[1:ncol(g), 1, j] <- unlist(g[j, ])
-    Q_z[1:ncol(g), -1, j] <- 0
-    Q_z[(ncol(g) + 1):dim(Q_z)[1], 1, j] <- 0
-    Q_z[(ncol(g) + 1):dim(Q_z)[1], -1, j] <- this_A
+    this_tc <- t(g[,-n_eff]) %*% G_J * g_J[j]
+    Q_z[t_ind, 1:J, j] <- unlist(g[j, ])
+    Q_z[t_ind, -(1:J), j] <- 0
+    Q_z[tc_ind, 1:J, j] <- this_tc
+    Q_z[tc_ind, -(1:J), j] <- 0
+    Q_z[d_ind, 1:J, j] <- 0
+    Q_z[d_ind, -(1:J), j] <- this_A
+    theta <- theta + Q_z[, , j] %*% c(Hbar[,j], Rbar[,j])
     vcv <- vcv + (1 / length(jj)) * (Q_z[,, j] %*% s_z[,, j] %*% t(Q_z[,, j]))
   }
   # Create science matrices -----------------------------
 
-  tau_y <- t(g) %*% Ybar
-  tau_d <- Aw %*% c(Dbar)
-
-  tau <- tau_y / tau_d
   
-  v_tau_y <- diag(vcv)[1:n_eff]
-  v_tau_d <- diag(vcv)[n_eff + (1:n_eff)]
-  c_tau_yd <- diag(vcv[1:n_eff, n_eff + (1:n_eff)])
-  names(tau) <- names(tau_y) <- names(tau_d) <- colnames(g)
-  names(v_tau_y) <- names(v_tau_d) <- names(c_tau_yd) <- colnames(g)
+  tau <- theta[t_ind]
+  tau_c <- theta[tc_ind]
+  delta <- theta[d_ind] ##Aw %*% c(Dbar)
+
+  phi <- tau / delta
+  gamma <- tau_c / delta[n_eff]
+  
+  v_tau <- diag(vcv)[t_ind]
+  v_delta <- diag(vcv)[d_ind]
+  c_tau_delta <- diag(vcv[t_ind, d_ind])
+  v_tau_c <- diag(vcv)[tc_ind]
+  v_delta_c <- rep(v_delta[n_eff], times = length(gamma))
+  c_tau_delta_c <- c(vcv[tc_ind, d_ind[n_eff]])
+  
+  names(phi) <- names(tau) <- names(delta) <- colnames(g)
+  names(v_tau) <- names(v_delta) <- names(c_tau_delta) <- colnames(g)
+  names(tau_c) <- names(gamma) <- colnames(g)[-n_eff]
   
   alpha <- (1 - level) / 2
   qq <- qnorm(alpha)
 
-  aa <- tau_d ^ 2 - qq ^ 2 * v_tau_d
-  bb <- -2 * (tau_d * c(tau_y) - qq ^ 2 * c_tau_yd)
-  cc <- c(tau_y ^ 2 - qq ^ 2 * v_tau_y)
+  num <- c(tau, tau_c)
+  den <- c(delta, rep(delta[n_eff], length(tau_c)))
+  v_num <- c(v_tau, v_tau_c)
+  v_den <- c(v_delta, v_delta_c)
+  c_num_den <- c(c_tau_delta, c_tau_delta_c)
+  aa <- den ^ 2 - qq ^ 2 * v_den
+  bb <- -2 * (den * num - qq ^ 2 * c_num_den)
+  cc <- c(num ^ 2 - qq ^ 2 * v_num)
 
   ## ignoring aa being exactly 0
   deter <- bb ^ 2 - 4 * aa * cc
@@ -222,19 +236,27 @@ iv_finite_fit <- function(y, d, z, level = 0.95, ways = 1, joint_compliers = TRU
   moe <- rep(NA, K)
   moe[deter > 0] <- sqrt(deter[deter > 0]) / (2 * aa[deter > 0])
   cntr <- bb / (-2 * aa)
-  tau_cis <- matrix(NA, nrow = n_eff, ncol = 4)
+  tau_cis <- matrix(NA, nrow = length(num), ncol = 4)
   tau_cis[closed, 1:2] <- cbind(cntr - moe, cntr + moe)[closed, ]
   tau_cis[infinite, 1] <- -Inf
   tau_cis[infinite, 2] <- Inf
   tau_cis[disjoint, 1] <- -Inf
   tau_cis[disjoint, 4] <- Inf
   tau_cis[disjoint, 2:3] <- cbind(cntr + moe, cntr - moe)[disjoint, ]
-  rownames(tau_cis) <- names(tau)
+  rownames(tau_cis) <- c(names(phi), names(gamma))
   colnames(tau_cis) <- c("ci_1_lower", "ci_1_upper", "ci_2_lower", "ci_2_upper")
-  return(list(tau = tau, tau_cis = tau_cis,
-              tau_y = tau_y, v_tau_y = v_tau_y,
-              tau_d = tau_d, v_tau_d = v_tau_d,
-              level = level))
+  mcafe_cis <- tau_cis[t_ind,]
+  jcafe_cis <- tau_cis[tc_ind,]
+  mcafe_est <- cbind(tau, delta, phi)
+  rownames(mcafe_est) <- names(phi)
+  colnames(mcafe_est) <- c("itt_y", "itt_d", "mcafe")
+  jcafe_est <- cbind(tau_c, rep(delta[n_eff], length(tau_c)), gamma)
+  rownames(jcafe_est) <- names(gamma)
+  colnames(jcafe_est) <- c("itt_y", "pr_joint_c", "jcafe")
+
+  return(list(mcafe_est = mcafe_est, jcafe_est = jcafe_est,
+              mcafe_cis = mcafe_cis, jcafe_cis = jcafe_cis,
+              theta = theta, vcv = vcv, level = level))
 }
 
 #' @export
@@ -242,25 +264,51 @@ print.iv_finite_factorial <- function(x, ...) {
   cat("\nCall:\n")
   print(x$call)
 
-  cat("\nRatio of Y-Z:D-Z effects:\n")
-  out <- cbind(x$tau, x$tau_cis)
+  cat("\nMarginalized-complier factorial effects:\n")
+  print(x$mcafe_est)
+
+  cat("\nJoint-complier factorial effects:\n")
+  print(x$jcafe_est)
+  invisible(x)
+}
+
+
+#' @export
+summary.iv_finite_factorial <- function(x, ...) {
+  cat("\nCall:\n")
+  print(x$call)
+  
+  
+  cis <- rbind(x$mcafe_cis, x$jcafe_cis)
+  mcafe_out <- cbind(x$mcafe_est[,"mcafe"], x$mcafe_cis)
   perc <- paste0(format(100 * x$level, trim = TRUE, scientific = FALSE,
                         digits = 3), "%")
-  ci1 <- apply(format(x$tau_cis[, 1:2], digits = 3),
+  ci1 <- apply(format(cis[, 1:2], digits = 3),
                1, paste, collapse = ", ", sep = "")
   ci1 <- paste0("(", ci1, ")")
-  disj <- which(!is.na(x$tau_cis[, 3]))
+  disj <- which(!is.na(cis[, 3]))
   if (length(disj)) {
-    ci2 <- apply(format(x$tau_cis[disj, 3:4, drop = FALSE], digits = 3),
+    ci2 <- apply(format(cis[disj, 3:4, drop = FALSE], digits = 3),
                  1, paste, collapse = ", ", sep = "")
     ci2 <- paste0("(", ci2, ")")
     ci1[disj] <- paste(ci1[disj], ci2, sep = " U ")
   }
-  out <- cbind(format(x$tau, digits = 3), ci1)
-  colnames(out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(out) <- names(x$tau)
-  print(out, quote = FALSE)
-  cat("\n")
+
+  mcafe_ci <- ci1[1:nrow(x$mcafe_cis)]
+  jcafe_ci <- ci1[-(1:nrow(x$mcafe_cis))]
+  cat("\nMarginalized-complier factorial effects:\n")
+  mcafe_out <- cbind(format(x$mcafe_est[,3], digits = 3), mcafe_ci)
+  
+  colnames(mcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
+  rownames(mcafe_out) <- rownames(x$mcafe_est)
+  print(mcafe_out, quote = FALSE)
+
+  cat("\nJoint-complier factorial effects:\n")
+  jcafe_out <- cbind(format(x$jcafe_est[,3], digits = 3), jcafe_ci)
+  colnames(jcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
+  rownames(jcafe_out) <- rownames(x$jcafe_est)
+  print(jcafe_out, quote = FALSE)
+
   invisible(x)
 }
 

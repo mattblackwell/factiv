@@ -4,14 +4,7 @@
 \alias{iv_finite_factorial}
 \title{Finite-Sample IV Estimation of 2^K Factorial Design}
 \usage{
-iv_finite_factorial(
-  formula,
-  data,
-  subset,
-  ways = 1,
-  level = 0.95,
-  joint_compliers = FALSE
-)
+iv_finite_factorial(formula, data, subset, level = 0.95)
 }
 \arguments{
 \item{formula}{formula specification of the factorial design with
@@ -24,9 +17,9 @@ formula must match.}
 
 \item{data}{a data.frame on which to apply the \code{formula}.}
 
-\item{ways}{the highest degree of interaction effect to estimate.}
-
 \item{level}{the confidence level required.}
+
+\item{ways}{the highest degree of interaction effect to estimate.}
 
 \item{joint_compliers}{a logical indicating if all of the
 estimated effects should be calculated for compliers on all
