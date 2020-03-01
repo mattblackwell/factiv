@@ -47,13 +47,12 @@
 ##' data(newhaven)
 ##'
 ##' out <- iv_finite_factorial(turnout_98 ~ inperson + phone | inperson_rand
-##'   + phone_rand, data = newhaven, ways = 2)
+##'   + phone_rand, data = newhaven)
 ##'
 ##' out
 ##'
 ##' joint <- iv_finite_factorial(turnout_98 ~ inperson + phone |
-##'   inperson_rand + phone_rand, data = newhaven, ways = 2,
-##'   joint_compliers = TRUE)
+##'   inperson_rand + phone_rand, data = newhaven)
 ##'
 ##' joint
 ##' 
