@@ -175,7 +175,16 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
   }
   Ghat <- (1 / N) * iv_g(res, x = dat, W = W0, Z = inits$Ztilde,
                          D = inits$Dtilde, A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)$Ghat
-  res_var <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+  res_var <- matrix(NA, nrow = ncol(Ghat), ncol = ncol(Ghat))
+  if (qr(Ghat)$rank < ncol(Ghat)) {
+    drop_ranks <- sapply(1:ncol(Ghat), function(x) qr(Ghat[, -x])$rank)
+    bad_cols <- which(drop_ranks == max(drop_ranks))
+    Ghat <- Ghat[, -bad_cols]
+    res_var[-bad_cols, -bad_cols] <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+  } else {
+    res_var <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+  }
+  
   rho_params <- res[1:(sum(!is.na(inits$rho)) - 1)]
   
   out <- list()
@@ -250,27 +259,33 @@ iv_init <- function(y, d, z) {
   psi <- rep(NA, times = ncol(B))
   names(psi) <- colnames(B)
 
-  f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
-  B_valid <- which(f_dz > 0)
-  A_valid <- which(f_dz > 0 & f_dz < 1)
-  rho_valid <- which(colSums(A[f_dz == 0, ]) == 0)
-  A <- A[, rho_valid]
-  rho[rho_valid] <- solve(crossprod(A[A_valid,])) %*% t(A[A_valid,]) %*% f_dz[A_valid]
+  ZD <- colSums(Ztilde * Dtilde)
+  f_dz <- ZD / colSums(Ztilde)
+  rho_tmp <- solve(crossprod(A)) %*% crossprod(A, f_dz)
+  B_valid <- which(ZD > 1)
+  A_valid <- which(ZD > 1 & f_dz < 1)
+  ##A_valid <- A_valid[duplicated(z_grid[A_valid,, drop = FALSE])]
+  rho <- lm.fit(x = A[A_valid, ], y = f_dz[A_valid])$coefficients
+  rho_valid <- which(!is.na(rho) & rho > 1/N)
+  rho[-rho_valid] <- NA
+  rho[rho_valid] <- rho[rho_valid] / sum(rho[rho_valid])
+  ##A <- A[A_valid, rho_valid, drop = FALSE]
 
   S_dz <- colSums(Ztilde * y * Dtilde) / colSums(Ztilde)
-
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
   brho_pos <- match(brho_names, names(rho))
-  psi_valid <- brho_pos %in% rho_valid
-  B <- B[B_valid, psi_valid]
-  Bp <- B %*% diag(rho[brho_pos[psi_valid]])
-  psi[psi_valid] <- solve(crossprod(Bp)) %*% t(Bp) %*% S_dz[B_valid]
+  psi_valid <- which(brho_pos %in% rho_valid)
+  Bp <- B[B_valid, psi_valid, drop = FALSE] %*% diag(rho[brho_pos[psi_valid]])
+  colnames(Bp) <- colnames(B[, psi_valid])
+  psi[psi_valid] <- lm.fit(x = Bp, y = S_dz[B_valid])$coefficients
+  psi_valid <- which(!is.na(psi))
+  B <- B[B_valid, psi_valid, drop = FALSE]
 
   ## dropping one row of A per combination of Z since they sum to 1
   ## we don't do this above because it creates inversion issues
   ## when trying to get the initial rho estimates
-  A_valid <- A_valid[duplicated(z_grid[A_valid, ])]
-  A <- A[A_valid, ]
+  A_valid <- A_valid[duplicated(z_grid[A_valid,, drop = FALSE])]
+  A <- A[A_valid,rho_valid, drop = FALSE]
   return(list(A = A, B = B, Ztilde = Ztilde, Dtilde = Dtilde,
               A_valid = A_valid, B_valid = B_valid,
               rho = rho, psi = psi))
@@ -292,7 +307,6 @@ iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
   psi <- theta[colnames(B)]
   y <- x[, 5]
 
-  ## remove one A constraint per Z combination
   Arho <- matrix(A %*% rho, nrow = N, ncol = nrow(A), byrow = TRUE)
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
   brho_pos <- match(brho_names, colnames(A))
@@ -305,7 +319,7 @@ iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
 
   
   
-  ghats <- colMeans(moments)  
+  ghats <- colMeans(moments)
   loss <- crossprod(ghats, W %*% ghats)
 
   Zbar <- colSums(Z)
@@ -334,11 +348,16 @@ iv_g_loss <- function(...) {
 }
 
 psi_to_tau <- function(psi, K, vcv) {
-  cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2^(K-1)
+  cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2 ^ (K - 1)
   all_c <- grep(paste0(rep("c", K), collapse = ""), names(psi), value = TRUE)
   mains <- c(t(cons) %*% psi[all_c])
-  mains_vcv <- t(cons) %*% vcv[all_c, all_c] %*% as.matrix(cons)
-  mains_se <- sqrt(diag(mains_vcv))
+  if (sum(is.na(mains)) == 0) {
+    mains_vcv <- t(cons) %*% vcv[all_c, all_c] %*% as.matrix(cons)
+    mains_se <- sqrt(diag(mains_vcv))
+  } else {
+    warning("supercomplier effects not identified")
+    mains_se <- rep(NA, times = K)
+  }
   return(list(tau = mains, tau_se = mains_se))
 }
 
