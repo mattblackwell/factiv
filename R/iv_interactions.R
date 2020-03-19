@@ -7,6 +7,7 @@
 ##' pairs, along with treatment exclusion. See Blackwell (2017) for
 ##' more details on those assumptions.
 ##'
+##'
 ##' The procedure uses iterative generalized method of moments (GMM)
 ##' to  estimate both the proportions of each compliance class (also
 ##' known as principal strata) and the average potential outcomes
@@ -33,8 +34,11 @@
 ##'   with each treatment variable. The order of the variables in the
 ##'   formula must match. 
 ##' @param data A data.frame on which to apply the \code{formula}.
+##' @param method character indiciating if the GMM should be
+##' \code{"onestep"} using the identity weighting matrix (default) or
+##' \code{"iterative"} to estimate the GMM weighting matrix. 
 ##' @param max_iter maximum number of iterations to conduct when
-##'   estimating the GMM. 
+##'   estimating the interative GMM. 
 ##' @param tol criteria for stopping the iterative GMM procedure. 
 ##' @return A list of class \code{iv_factorial} that contains the following
 ##'   components: 
@@ -47,7 +51,7 @@
 ##' \item{vcov}{estimated asymptotic variance matrix of the combined
 ##'   \code{rho} and \code{psi} parameters.}
 ##' \item{tau}{vector of estimated main effects of each factor among
-##'   joint compliers.}
+##'   supercompliers.}
 ##' \item{tau_se}{vector of estimated standard errors for the
 ##'   estimated effects in \code{tau}.}
 ##' @author Matt Blackwell
@@ -71,10 +75,11 @@
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
-iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
+iv_factorial <- function(formula, data, subset, method = "onestep", max_iter = 15,
+                         tol = 10e-7) {
   cl <- match.call(expand.dots = TRUE)
   mf <- match.call(expand.dots = FALSE)
-
+  stopifnot(method %in% c("onestep", "iterative"))
   m <- match(
     x = c("formula", "data", "subset"),
     table = names(mf),
@@ -106,11 +111,13 @@ iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
   Y <- model.response(mf, "numeric")
   D <- model.matrix(mt_d, mf)
   Z <- model.matrix(mt_z, mf)
-  out <- iv_gmm_fit(Y, D, Z, max_iter = max_iter, tol = tol)
+  out <- iv_gmm_fit(Y, D, Z, method, max_iter = max_iter, tol = tol)
   out$call <- cl
   out$df.residual <- nrow(D) - ncol(out$vcov)
   return(out)
 }
+
+
 
 ##' Fits a GMM for IV in 2^K Factorial Experiments
 ##'
@@ -119,8 +126,11 @@ iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
 ##' @param y vector of outcomes.
 ##' @param d K-column matrix of binary treatments.
 ##' @param z K-column matrix of binary instruments.
+##' @param method character indiciating if the GMM should be
+##' \code{"onestep"} using the identity weighting matrix (default) or
+##' \code{"iterative"} to estimate the GMM weighting matrix. 
 ##' @param max_iter maximum number of iterations to conduct when
-##'   estimating the GMM. 
+##'   estimating the iterative GMM. 
 ##' @param tol criteria for stopping the iterative GMM procedure. 
 ##' @return A list of class \code{iv_factorial} that contains the following
 ##'   components: 
@@ -133,20 +143,20 @@ iv_factorial <- function(formula, data, subset, max_iter = 15, tol = 10e-7) {
 ##' \item{vcov}{estimated asymptotic variance matrix of the combined
 ##'   \code{rho} and \code{psi} parameters.}
 ##' \item{tau}{vector of estimated main effects of each factor among
-##'   joint compliers.}
+##'   supercompliers.}
 ##' \item{tau_se}{vector of estimated standard errors for the
 ##'   estimated effects in \code{tau}.}
 ##' @author Matt Blackwell
 ##' @importFrom stats optim
 
-iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {  
+iv_gmm_fit <- function(y, d, z, method, max_iter = 15, tol = 10e-7) {  
   N <- length(y)
   K <- dim(d)[2]
   inits <- iv_init(y, d, z)
   A <- inits$A
   B <- inits$B
   dat <- cbind(d, z, y)
-  W0 <- diag(nrow = nrow(A) + nrow(B))
+  W0 <- diag(nrow = length(inits$A_valid) + length(inits$B_valid))
   start <- c(inits$rho[!is.na(inits$rho)][-1],
              inits$psi[!is.na(inits$psi)])
   first <- optim(par = start,
@@ -155,34 +165,62 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
                  A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid,
                  method = "BFGS")
   res <- first$par
+  g_out <- iv_g(res, x = dat, W = W0, Z = inits$Ztilde, D = inits$Dtilde,
+               A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)
+  ghat <- g_out$moments
   delt <- 1000
   count <- 0
-  while (count <= max_iter & delt > tol) {
-    ghat <- iv_g(res, x = dat, W = W0, Z = inits$Ztilde, D = inits$Dtilde,
-                 A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)$moments
-    Lhat <- (1 / N) * t(ghat) %*% ghat
-    second <- optim(par = start,
-                 fn = iv_g_loss, gr = iv_grad,
-                 x = dat, W = solve(Lhat), Z = inits$Ztilde, D = inits$Dtilde,
-                 A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid,
-                 method = "BFGS")
-    delt <- sum(abs(res - second$par) / res)
-    res <- second$par
-    count <- count + 1
+  
+  if (method == "onestep" | qr(ghat)$rank < ncol(ghat)) {
+    if (qr(ghat)$rank < ncol(ghat) & method == "iterative") {
+      warning("iterative estimator has singular weight matrix, returning single step")
+    }
+    count <- max_iter + 1
+    Lhat <- (1 / N) * crossprod(ghat)
+    Ohat <- W0
   }
-  if (count == max_iter & delt > tol) {
+  
+  while (count <= max_iter & delt > tol) {
+    g_out <- iv_g(res, x = dat, W = W0, Z = inits$Ztilde, D = inits$Dtilde,
+                  A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)
+    ghat <- g_out$moments
+    Lhat <- (1 / N) * crossprod(ghat)
+    qr_ghat <- qr(Lhat)
+    if (qr_ghat$rank < ncol(ghat)) {
+      warning("iterative estimator has singular weight matrix, returning single step")
+      res <- first$par
+      count <- max_iter + 1
+    } else {
+      Ohat <- solve(qr_ghat)
+      
+      second <- optim(par = start,
+                      fn = iv_g_loss, gr = iv_grad,
+                      x = dat, W = Ohat, Z = inits$Ztilde, D = inits$Dtilde,
+                      A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid,
+                      method = "BFGS")
+      delt <- sum(abs(res - second$par) / res)
+      res <- second$par
+      count <- count + 1
+    }
+  }
+  if (count == max_iter & delt > tol & method == "iterative") {
     warning("Reached maximum iterations without converging...\n")
   }
   Ghat <- (1 / N) * iv_g(res, x = dat, W = W0, Z = inits$Ztilde,
-                         D = inits$Dtilde, A = A, B = B, A_valid = inits$A_valid, B_valid = inits$B_valid)$Ghat
+                         D = inits$Dtilde, A = A, B = B,
+                         A_valid = inits$A_valid, B_valid = inits$B_valid)$Ghat
   res_var <- matrix(NA, nrow = ncol(Ghat), ncol = ncol(Ghat))
   if (qr(Ghat)$rank < ncol(Ghat)) {
     drop_ranks <- sapply(1:ncol(Ghat), function(x) qr(Ghat[, -x])$rank)
-    bad_cols <- which(drop_ranks == max(drop_ranks))
+    bad_cols <- which(drop_ranks == max(drop_ranks))[-1]
     Ghat <- Ghat[, -bad_cols]
-    res_var[-bad_cols, -bad_cols] <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+    Ahat <- crossprod(Ghat, Ohat %*% Ghat)
+    Bhat <- crossprod(Ghat, (Ohat %*% Lhat %*% Ohat) %*% Ghat)    
+    res_var[-bad_cols, -bad_cols] <- (solve(Ahat) %*% Bhat %*% solve(Ahat)) / N
   } else {
-    res_var <- solve(t(Ghat) %*% solve(Lhat) %*% Ghat) / N
+    Ahat <- crossprod(Ghat, Ohat %*% Ghat)
+    Bhat <- crossprod(Ghat, (Ohat %*% Lhat %*% Ohat) %*% Ghat)    
+    res_var <- (solve(Ahat) %*% Bhat %*% solve(Ahat)) / N
   }
   
   rho_params <- res[1:(sum(!is.na(inits$rho)) - 1)]
@@ -198,7 +236,7 @@ iv_gmm_fit <- function(y, d, z, max_iter = 15, tol = 10e-7) {
   out$vcov <- res_var
   out$init <- inits
   
-  effs <- psi_to_tau(out$psi, K, res_var)
+  effs <- psi_to_tau(out$psi, out$rho, K, res_var)
   out$tau <- effs$tau
   out$tau_se <- effs$tau_se
   names(out$tau) <- names(out$tau_se) <- colnames(d)
@@ -262,30 +300,44 @@ iv_init <- function(y, d, z) {
   ZD <- colSums(Ztilde * Dtilde)
   f_dz <- ZD / colSums(Ztilde)
   rho_tmp <- solve(crossprod(A)) %*% crossprod(A, f_dz)
-  B_valid <- which(ZD > 1)
-  A_valid <- which(ZD > 1 & f_dz < 1)
+  ## sanity check - find any marginal comliance types that have 0 prob
+  ## we do this because the rho_tmp sometimes "splits" the 0 prob into
+  ## a small pos and neg number across two joint strata
+  bad_rho <- rep(0, times = length(rho_tmp))
+  for (k in 1:K) {
+    marg_c <- sum(rho_tmp[ps_grid[,k] == "c"]) < (2 * .Machine$double.eps)
+    bad_rho[ps_grid[,k] == "c"] <- bad_rho[ps_grid[,k] == "c"] + marg_c
+    marg_a <- sum(rho_tmp[ps_grid[,k] == "a"]) < (2 * .Machine$double.eps)
+    bad_rho[ps_grid[,k] == "a"] <- bad_rho[ps_grid[,k] == "a"] + marg_a
+    marg_n <- sum(rho_tmp[ps_grid[,k] == "n"]) < (2 * .Machine$double.eps)
+    bad_rho[ps_grid[,k] == "n"] <- bad_rho[ps_grid[,k] == "n"] + marg_n
+  }
+  bad_rho <- bad_rho + (rho_tmp <= 0)
+  B_valid <- which(ZD >= 0)
+  A_valid <- which(ZD >= 0 & f_dz <= 1)
   ##A_valid <- A_valid[duplicated(z_grid[A_valid,, drop = FALSE])]
-  rho <- lm.fit(x = A[A_valid, ], y = f_dz[A_valid])$coefficients
-  rho_valid <- which(!is.na(rho) & rho > 1/N)
-  rho[-rho_valid] <- NA
-  rho[rho_valid] <- rho[rho_valid] / sum(rho[rho_valid])
+  rho[bad_rho == 0] <- lm.fit(x = A[, bad_rho == 0],
+                              y = f_dz)$coefficients
+  rho_valid <- which(!is.na(rho))
+  ##rho[-rho_valid] <- NA
+  ##rho[rho_valid] <- rho[rho_valid] / sum(rho[rho_valid])
   ##A <- A[A_valid, rho_valid, drop = FALSE]
 
   S_dz <- colSums(Ztilde * y * Dtilde) / colSums(Ztilde)
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
   brho_pos <- match(brho_names, names(rho))
   psi_valid <- which(brho_pos %in% rho_valid)
-  Bp <- B[B_valid, psi_valid, drop = FALSE] %*% diag(rho[brho_pos[psi_valid]])
-  colnames(Bp) <- colnames(B[, psi_valid])
-  psi[psi_valid] <- lm.fit(x = Bp, y = S_dz[B_valid])$coefficients
+  ## Bp <- B[, psi_valid, drop = FALSE] %*% diag(rho[brho_pos[psi_valid]])
+  ## colnames(Bp) <- colnames(B[, psi_valid])
+  psi[psi_valid] <- lm.fit(x = B[, psi_valid], y = S_dz)$coefficients
   psi_valid <- which(!is.na(psi))
-  B <- B[B_valid, psi_valid, drop = FALSE]
+  B <- B[, psi_valid, drop = FALSE]
 
   ## dropping one row of A per combination of Z since they sum to 1
   ## we don't do this above because it creates inversion issues
   ## when trying to get the initial rho estimates
   A_valid <- A_valid[duplicated(z_grid[A_valid,, drop = FALSE])]
-  A <- A[A_valid,rho_valid, drop = FALSE]
+  A <- A[,rho_valid, drop = FALSE]
   return(list(A = A, B = B, Ztilde = Ztilde, Dtilde = Dtilde,
               A_valid = A_valid, B_valid = B_valid,
               rho = rho, psi = psi))
@@ -306,33 +358,33 @@ iv_g <- function(theta, x, W, Z, D, A, B, A_valid, B_valid) {
   names(rho)[1] <- colnames(A)[1]
   psi <- theta[colnames(B)]
   y <- x[, 5]
-
+  A <- A[A_valid,]
+  B <- B[B_valid,]
   Arho <- matrix(A %*% rho, nrow = N, ncol = nrow(A), byrow = TRUE)
   brho_names <- sapply(strsplit(colnames(B), "_"), function(x) x[2])
   brho_pos <- match(brho_names, colnames(A))
-  Bp <- B %*% diag(rho[brho_pos])
-  Bppsi <- matrix(Bp %*% psi, nrow = N, ncol = nrow(B), byrow = TRUE)
+  ## Bp <- B %*% diag(rho[brho_pos])
+  Bpsi <- matrix(B %*% psi, nrow = N, ncol = nrow(B), byrow = TRUE)
 
   ## drops are redundant orthogonality conditions
   moments <- cbind(Z[, A_valid] * (D[, A_valid] - Arho),
-                   Z[, B_valid] * (y * D[, B_valid] - Bppsi))
-
+                   Z[, B_valid] * (y * D[, B_valid] - Bpsi))
   
   
   ghats <- colMeans(moments)
   loss <- crossprod(ghats, W %*% ghats)
 
   Zbar <- colSums(Z)
-  rho_psi <- matrix(NA, nrow = nrow(B), ncol = ncol(A) - 1)
-  for (j in 2:ncol(A)) {
-    Bscreen <- diag(1 * (brho_pos == j))
-    Bscreen[1,1] <- -1
-    rho_psi[,j-1] <- -Zbar[B_valid] * (B %*% Bscreen %*% psi)
-  }
+  rho_psi <- matrix(0, nrow = nrow(B), ncol = ncol(A) - 1)
+  ## for (j in 2:ncol(A)) {
+  ##   Bscreen <- diag(1 * (brho_pos == j))
+  ##   Bscreen[1,1] <- -1
+  ##   rho_psi[,j-1] <- -Zbar[B_valid] * (B %*% Bscreen %*% psi)
+  ## }
   A1 <- A[,-1] + -1 * A[,1]
   rho_grad <- cbind(-Zbar[A_valid] * A1,
                     matrix(0, nrow = nrow(A), ncol = ncol(B)))
-  psi_grad <- cbind(rho_psi, -Zbar[B_valid] * Bp)
+  psi_grad <- cbind(rho_psi, -Zbar[B_valid] * B)
   Ghat <- rbind(rho_grad, psi_grad)
   Qgrad <- crossprod(Ghat, W %*% ghats)
   
@@ -347,13 +399,21 @@ iv_g_loss <- function(...) {
   iv_g(...)$loss
 }
 
-psi_to_tau <- function(psi, K, vcv) {
+psi_to_tau <- function(psi, rho, K, vcv) {
   cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2 ^ (K - 1)
-  all_c <- grep(paste0(rep("c", K), collapse = ""), names(psi), value = TRUE)
-  mains <- c(t(cons) %*% psi[all_c])
+  rho_c <- paste0(rep("c", K), collapse = "")
+  psi_c <- grep(rho_c, names(psi), value = TRUE)
+  num <- c(t(cons) %*% psi[psi_c])
+  den <- rho[rho_c]
+  mains <- num / den
   if (sum(is.na(mains)) == 0) {
-    mains_vcv <- t(cons) %*% vcv[all_c, all_c] %*% as.matrix(cons)
-    mains_se <- sqrt(diag(mains_vcv))
+    num_var <- diag(t(cons) %*% vcv[psi_c, psi_c] %*% as.matrix(cons))
+    den_var <- vcv[rho_c, rho_c]
+    nd_cov <- c(t(cons) %*% vcv[psi_c, rho_c])
+    mains_var <- den ^ (-2) * num_var +
+      (num ^ 2 / den ^ 4) * den_var -
+      2 * (num / den ^ 3) * nd_cov
+    mains_se <- sqrt(mains_var)
   } else {
     warning("supercomplier effects not identified")
     mains_se <- rep(NA, times = K)
@@ -388,9 +448,9 @@ summary.iv_factorial <- function(object, ...) {
 
 #' @export
 print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
-  cat("\n Main effects among joint compliers:\n")
+  cat("\n Main effects among supercompliers:\n")
   stats::printCoefmat(x$coefficients, digits = digits)
-  cat("\nEstimated prob. of joint compliers: ",
+  cat("\nEstimated prob. of supercompliers: ",
       formatC(x$c_prob, digits), "\tSE = ", formatC(x$c_prob_se, digits))
   cat("\n")
   invisible(x)

@@ -4,7 +4,7 @@
 \alias{iv_gmm_fit}
 \title{GMM for Estimation of 2^K Factorial Design}
 \usage{
-iv_gmm_fit(y, d, z, max_iter = 15, tol = 1e-06)
+iv_gmm_fit(y, d, z, method, max_iter = 15, tol = 1e-06)
 }
 \arguments{
 \item{y}{vector of outcomes.}
@@ -13,8 +13,12 @@ iv_gmm_fit(y, d, z, max_iter = 15, tol = 1e-06)
 
 \item{z}{K-column matrix of binary instruments.}
 
+\item{method}{character indiciating if the GMM should be
+\code{"onestep"} using the identity weighting matrix (default) or
+\code{"iterative"} to estimate the GMM weighting matrix.}
+
 \item{max_iter}{maximum number of iterations to conduct when
-estimating the GMM.}
+estimating the iterative GMM.}
 
 \item{tol}{criteria for stopping the iterative GMM procedure.}
 }
@@ -30,7 +34,7 @@ A list of class \code{iv_factorial} that contains the following
 \item{vcov}{estimated asymptotic variance matrix of the combined
   \code{rho} and \code{psi} parameters.}
 \item{tau}{vector of estimated main effects of each factor among
-  joint compliers.}
+  supercompliers.}
 \item{tau_se}{vector of estimated standard errors for the
   estimated effects in \code{tau}.}
 }

@@ -4,7 +4,14 @@
 \alias{iv_factorial}
 \title{IV Estimation of 2^K Factorial Design}
 \usage{
-iv_factorial(formula, data, subset, max_iter = 15, tol = 1e-06)
+iv_factorial(
+  formula,
+  data,
+  subset,
+  method = "onestep",
+  max_iter = 15,
+  tol = 1e-06
+)
 }
 \arguments{
 \item{formula}{formula specification of the factorial design with
@@ -17,8 +24,12 @@ formula must match.}
 
 \item{data}{A data.frame on which to apply the \code{formula}.}
 
+\item{method}{character indiciating if the GMM should be
+\code{"onestep"} using the identity weighting matrix (default) or
+\code{"iterative"} to estimate the GMM weighting matrix.}
+
 \item{max_iter}{maximum number of iterations to conduct when
-estimating the GMM.}
+estimating the interative GMM.}
 
 \item{tol}{criteria for stopping the iterative GMM procedure.}
 }
@@ -34,7 +45,7 @@ A list of class \code{iv_factorial} that contains the following
 \item{vcov}{estimated asymptotic variance matrix of the combined
   \code{rho} and \code{psi} parameters.}
 \item{tau}{vector of estimated main effects of each factor among
-  joint compliers.}
+  supercompliers.}
 \item{tau_se}{vector of estimated standard errors for the
   estimated effects in \code{tau}.}
 }
@@ -48,6 +59,7 @@ experiments in the face of noncompliance on all factors. A
 monotonicity assumption is assumed for both treatment-instrument
 pairs, along with treatment exclusion. See Blackwell (2017) for
 more details on those assumptions.
+
 
 The procedure uses iterative generalized method of moments (GMM)
 to  estimate both the proportions of each compliance class (also
