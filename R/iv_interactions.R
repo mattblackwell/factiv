@@ -379,10 +379,10 @@ print.iv_factorial <- function(x, ...) {
 #' @export
 summary.iv_factorial <- function(object, ...) {
   rdf <- object$df.residual
-  tval <- object$tau / object$tau_se
+  tval <- object$scafe_est / object$scafe_se
   pval <- 2 * pt(abs(tval), rdf, lower.tail = FALSE)
   out <- object[c("call", "terms", "vcov")]
-  out$coefficients <- cbind(object$tau, object$tau_se, tval, pval)
+  out$coefficients <- cbind(object$scafe_est, object$scafe_se, tval, pval)
   out$c_prob <- object$rho[length(object$rho)]
   c_pos <- sum(!is.na(object$rho)) - 1
   out$c_prob_se <- sqrt(out$vcov[c_pos, c_pos])
