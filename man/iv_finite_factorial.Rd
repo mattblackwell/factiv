@@ -17,15 +17,9 @@ formula must match.}
 
 \item{data}{a data.frame on which to apply the \code{formula}.}
 
+\item{subset}{subset of the data to pass to estimation.}
+
 \item{level}{the confidence level required.}
-
-\item{ways}{the highest degree of interaction effect to estimate.}
-
-\item{joint_compliers}{a logical indicating if all of the
-estimated effects should be calculated for compliers on all
-factors. By default, this is \code{FALSE} and the each factorial
-effect is estimated among the compliers for the factors in that
-effect.}
 }
 \value{
 A list of class \code{iv_finite_factorial} that contains the following

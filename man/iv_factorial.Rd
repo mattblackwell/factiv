@@ -4,14 +4,7 @@
 \alias{iv_factorial}
 \title{IV Estimation of 2^K Factorial Design}
 \usage{
-iv_factorial(
-  formula,
-  data,
-  subset,
-  method = "onestep",
-  max_iter = 15,
-  tol = 1e-06
-)
+iv_factorial(formula, data, subset, method = "lm", level = 0.95)
 }
 \arguments{
 \item{formula}{formula specification of the factorial design with
@@ -24,14 +17,13 @@ formula must match.}
 
 \item{data}{A data.frame on which to apply the \code{formula}.}
 
-\item{method}{character indiciating if the GMM should be
-\code{"onestep"} using the identity weighting matrix (default) or
-\code{"iterative"} to estimate the GMM weighting matrix.}
+\item{subset}{subset of the data to pass to estimation.}
 
-\item{max_iter}{maximum number of iterations to conduct when
-estimating the interative GMM.}
+\item{method}{character indiciating if the estimator should be
+\code{"lm"} using the least squares approach (default) or
+\code{"cmd"} to estimate via efficent minimum distance estimator.}
 
-\item{tol}{criteria for stopping the iterative GMM procedure.}
+\item{level}{the confidence level required.}
 }
 \value{
 A list of class \code{iv_factorial} that contains the following
@@ -44,10 +36,13 @@ A list of class \code{iv_factorial} that contains the following
   for the GMM estimation based on a just-identified estimation.}
 \item{vcov}{estimated asymptotic variance matrix of the combined
   \code{rho} and \code{psi} parameters.}
-\item{tau}{vector of estimated main effects of each factor among
+\item{scafe_est}{vector of estimated main effects of each factor among
   supercompliers.}
-\item{tau_se}{vector of estimated standard errors for the
+\item{scafe_se}{vector of estimated standard errors for the
   estimated effects in \code{tau}.}
+\item{scafe_cis}{a matrix of confidence intervals for the SCAFE
+estimates.}
+\item{level}{the confidence level of \code{scafe_cis}.}
 }
 \description{
 Estimates principal stratum-specific effects and interactions in a

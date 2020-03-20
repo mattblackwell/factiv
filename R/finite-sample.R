@@ -16,13 +16,8 @@
 ##'   with each treatment variable. The order of the variables in the
 ##'   formula must match. 
 ##' @param data a data.frame on which to apply the \code{formula}.
-##' @param ways the highest degree of interaction effect to estimate. 
+##' @param subset subset of the data to pass to estimation.
 ##' @param level the confidence level required.
-##' @param joint_compliers a logical indicating if all of the
-##'   estimated effects should be calculated for compliers on all
-##'   factors. By default, this is \code{FALSE} and the each factorial
-##'   effect is estimated among the compliers for the factors in that
-##'   effect.  
 ##' @return A list of class \code{iv_finite_factorial} that contains the following
 ##'   components: 
 ##' \item{tau}{a vector of estimated effect ratios for each factor.}
@@ -245,17 +240,17 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   rownames(tau_cis) <- c(names(phi), names(gamma))
   colnames(tau_cis) <- c("ci_1_lower", "ci_1_upper", "ci_2_lower", "ci_2_upper")
   mcafe_cis <- tau_cis[t_ind,]
-  jcafe_cis <- tau_cis[tc_ind,]
+  scafe_cis <- tau_cis[tc_ind,]
   mcafe_est <- cbind(tau, delta, phi)
   rownames(mcafe_est) <- names(phi)
   colnames(mcafe_est) <- c("itt_y", "itt_d", "mcafe")
-  jcafe_est <- cbind(tau_c, rep(delta[n_eff], length(tau_c)), gamma)
-  rownames(jcafe_est) <- names(gamma)
-  colnames(jcafe_est) <- c("itt_y", "pr_joint_c", "jcafe")
+  scafe_est <- cbind(tau_c, rep(delta[n_eff], length(tau_c)), gamma)
+  rownames(scafe_est) <- names(gamma)
+  colnames(scafe_est) <- c("itt_y", "pr_joint_c", "scafe")
 
-  return(list(mcafe_est = mcafe_est, jcafe_est = jcafe_est,
-              mcafe_cis = mcafe_cis, jcafe_cis = jcafe_cis,
-              theta = theta, vcv = vcv, level = level))
+  return(list(mcafe_est = mcafe_est, scafe_est = scafe_est,
+              mcafe_cis = mcafe_cis, scafe_cis = scafe_cis,
+              theta = theta, vcov = vcv, level = level))
 }
 
 #' @export
@@ -266,8 +261,8 @@ print.iv_finite_factorial <- function(x, ...) {
   cat("\nMarginalized-complier factorial effects:\n")
   print(x$mcafe_est)
 
-  cat("\nJoint-complier factorial effects:\n")
-  print(x$jcafe_est)
+  cat("\nSupercomplier factorial effects:\n")
+  print(x$scafe_est)
   invisible(x)
 }
 
@@ -278,7 +273,7 @@ summary.iv_finite_factorial <- function(x, ...) {
   print(x$call)
   
   
-  cis <- rbind(x$mcafe_cis, x$jcafe_cis)
+  cis <- rbind(x$mcafe_cis, x$scafe_cis)
   mcafe_out <- cbind(x$mcafe_est[,"mcafe"], x$mcafe_cis)
   perc <- paste0(format(100 * x$level, trim = TRUE, scientific = FALSE,
                         digits = 3), "%")
@@ -294,7 +289,7 @@ summary.iv_finite_factorial <- function(x, ...) {
   }
 
   mcafe_ci <- ci1[1:nrow(x$mcafe_cis)]
-  jcafe_ci <- ci1[-(1:nrow(x$mcafe_cis))]
+  scafe_ci <- ci1[-(1:nrow(x$mcafe_cis))]
   cat("\nMarginalized-complier factorial effects:\n")
   mcafe_out <- cbind(format(x$mcafe_est[,3], digits = 3), mcafe_ci)
   
@@ -302,11 +297,11 @@ summary.iv_finite_factorial <- function(x, ...) {
   rownames(mcafe_out) <- rownames(x$mcafe_est)
   print(mcafe_out, quote = FALSE)
 
-  cat("\nJoint-complier factorial effects:\n")
-  jcafe_out <- cbind(format(x$jcafe_est[,3], digits = 3), jcafe_ci)
-  colnames(jcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(jcafe_out) <- rownames(x$jcafe_est)
-  print(jcafe_out, quote = FALSE)
+  cat("\nSupercomplier factorial effects:\n")
+  scafe_out <- cbind(format(x$scafe_est[,3], digits = 3), scafe_ci)
+  colnames(scafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
+  rownames(scafe_out) <- rownames(x$scafe_est)
+  print(scafe_out, quote = FALSE)
 
   invisible(x)
 }
