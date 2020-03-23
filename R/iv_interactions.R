@@ -116,19 +116,27 @@ iv_factorial <- function(formula, data, subset, method = "lm", level = 0.95) {
   } else {
     out <- factiv_cmd_fit(Y, D, Z)
   }
-  effs <- psi_to_tau(out$psi, out$rho, K, out$vcov)
-  out$scafe_est <- effs$tau
-  out$scafe_se <- effs$tau_se
+  effs <- psi_to_tau(out$psi, out$rho, K, out$vcov, colnames(D))
+  out$scafe_est <- effs$scafe_est
+  out$scafe_se <- effs$scafe_se
+  out$mcafe_est <- effs$mcafe_est
+  out$mcafe_se <- effs$mcafe_se
   out$level <- level
   alpha <- (1 - level) / 2
-  qq <- qnorm(alpha)
+  qq <- abs(qnorm(alpha))
   out$scafe_cis <- matrix(NA, nrow = length(out$scafe_est), ncol = 2)
   out$scafe_cis[, 1] <- out$scafe_est - qq * out$scafe_se
   out$scafe_cis[, 2] <- out$scafe_est + qq * out$scafe_se
-  rownames(out$scafe_cis) <- colnames(D)
-  colnames(out$scafe_cis) <- c("ci_lower", "ci_upper")  
-  names(out$scafe_est) <- names(out$scafe_se) <- colnames(D)
+  out$mcafe_cis <- matrix(NA, nrow = length(out$mcafe_est), ncol = 2)
+  out$mcafe_cis[, 1] <- out$mcafe_est - qq * out$mcafe_se
+  out$mcafe_cis[, 2] <- out$mcafe_est + qq * out$mcafe_se
+  rownames(out$scafe_cis) <- names(out$scafe_est)
+  colnames(out$scafe_cis) <- c("ci_lower", "ci_upper")
+  rownames(out$mcafe_cis) <- names(out$mcafe_est)
+  colnames(out$mcafe_cis) <- c("ci_lower", "ci_upper")  
+
   out$scafe_se[out$scafe_se == 0] <- NA
+  out$mcafe_se[out$mcafe_se == 0] <- NA
   class(out) <- "iv_factorial"
   out$call <- cl
   out$df.residual <- nrow(D) - ncol(out$vcov)
@@ -343,26 +351,85 @@ factiv_cmd_fit <- function(y, d, z) {
               psi = psi2, vcov = vcv2))
 }
 
-psi_to_tau <- function(psi, rho, K, vcv) {
-  cons <- expand.grid(rep(list(c(1, -1)), times = K)) / 2 ^ (K - 1)
-  rho_c <- paste0(rep("c", K), collapse = "")
-  psi_c <- grep(rho_c, names(psi), value = TRUE)
-  num <- c(t(cons) %*% psi[psi_c])
-  den <- rho[rho_c]
-  mains <- num / den
-  if (sum(is.na(mains)) == 0) {
-    num_var <- diag(t(cons) %*% vcv[psi_c, psi_c] %*% as.matrix(cons))
-    den_var <- vcv[rho_c, rho_c]
-    nd_cov <- c(t(cons) %*% vcv[psi_c, rho_c])
-    mains_var <- den ^ (-2) * num_var +
-      (num ^ 2 / den ^ 4) * den_var -
-      2 * (num / den ^ 3) * nd_cov
-    mains_se <- sqrt(mains_var)
-  } else {
-    warning("supercomplier effects not identified")
-    mains_se <- rep(NA, times = K)
+psi_to_tau <- function(psi, rho, K, vcv, var_names) {
+  J <- 2 ^ K - 1
+  L <- 2 ^ K
+
+  ## reference grids
+  ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
+  z_grid <- expand.grid(rep(list(c(1, 0)), times = K))
+  z_grid_str <- do.call(paste0, z_grid)
+  z_str <- apply(z, 1, paste0, collapse = "")
+
+  ## creating contrast matrices
+  g <- expand.grid(rep(list(c(1, -1)), times = K))
+  rownames(g) <- z_grid_str
+  g_m_psi <- matrix(0, nrow = length(rho) + length(psi), ncol = J)
+  rownames(g_m_psi) <- rownames(vcv)
+  g_s_psi <- g_m_rho <- g_s_rho <- g_m_psi
+  psi_d_grid <- sapply(strsplit(rownames(vcv), "_"),
+                        function(x) x[[1]])
+  psi_ps_grid <- sapply(strsplit(names(psi), "_"),
+                        function(x) x[[2]])
+  num_c <- rowSums(ps_grid == "c")
+  names(num_c) <- do.call(paste0, ps_grid)
+  psi_adj <- c(rep(0, times = length(rho)),
+               num_c[psi_ps_grid])
+  
+  g_s_rho[paste0(rep("c", K), collapse = ""),] <- 1
+  scomps_psi <- grep(paste0(c("_", rep("c", K)), collapse = ""),
+                     rownames(vcv))
+  comb_list <- all_subsets(1:K)
+  eff_labs <- character(J)
+  for (j in 1:J) {
+    this_comb <- comb_list[[j]]
+    k <- length(this_comb)
+    eff_labs[j] <- paste0(var_names[this_comb], collapse = ":")
+    
+    this_contr <- g[, this_comb, drop = FALSE]
+    this_contr <- apply(this_contr, 1, prod)
+    mcomps <- rowSums(ps_grid[, this_comb, drop = FALSE] == rep("c", k)) == k
+    mcomps <- apply(ps_grid[mcomps,, drop = FALSE], 1, paste0, collapse = "")
+    mcomps_psi <- grep(paste0("_(", paste0(mcomps, collapse = "|"), ")"),
+                       rownames(vcv))
+    g_m_rho[mcomps, j] <- 1
+    g_m_psi[mcomps_psi, j] <- this_contr[psi_d_grid[mcomps_psi]]
+    g_s_psi[scomps_psi, j] <- this_contr[psi_d_grid[scomps_psi]]
   }
-  return(list(tau = mains, tau_se = mains_se))
+  colnames(g_m_psi) <- colnames(g_s_psi) <- eff_labs
+  colnames(g_m_rho) <- colnames(g_s_rho) <- eff_labs
+  g_m_psi <- g_m_psi / 2 ^ (psi_adj - 1)
+  g_s_psi <- g_s_psi / 2 ^ (K-1)
+  
+  theta <- c(rho, psi)
+  m_num <- c(t(g_m_psi) %*% theta)
+  m_den <- c(t(g_m_rho) %*% theta)
+  s_num <- c(t(g_s_psi) %*% theta)
+  s_den <- c(t(g_s_rho) %*% theta)
+
+  mcafe_est <- m_num / m_den
+  scafe_est <- s_num / s_den
+  m_num_var <- diag(t(g_m_psi) %*% vcv %*% g_m_psi)
+  s_num_var <- diag(t(g_s_psi) %*% vcv %*% g_s_psi)
+  m_den_var <- diag(t(g_m_rho) %*% vcv %*% g_m_rho)
+  s_den_var <- diag(t(g_s_rho) %*% vcv %*% g_s_rho)
+  m_cov <- diag(t(g_m_psi) %*% vcv %*% g_m_rho)
+  s_cov <- diag(t(g_s_psi) %*% vcv %*% g_s_rho)
+  mcafe_var <- m_den ^ (-2) * m_num_var +
+    (m_num ^ 2 / m_den ^ 4) * m_den_var -
+    2 * (m_num / m_den ^ 3) * m_cov
+  scafe_var <- s_den ^ (-2) * s_num_var +
+    (s_num ^ 2 / s_den ^ 4) * s_den_var -
+    2 * (s_num / s_den ^ 3) * s_cov
+  mcafe_se <- sqrt(mcafe_var)
+  scafe_se <- sqrt(scafe_var)
+  return(list(mcafe_est = mcafe_est, mcafe_se = mcafe_se,
+              scafe_est = scafe_est, scafe_se = scafe_se))
+}
+
+all_subsets <- function(x) {
+  unlist(lapply(x, function(z) as.list(as.data.frame(combn(x, z)))),
+         recursive = FALSE)
 }
 
 #' @export
