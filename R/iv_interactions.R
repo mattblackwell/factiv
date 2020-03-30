@@ -359,7 +359,6 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
   ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
   z_grid <- expand.grid(rep(list(c(1, 0)), times = K))
   z_grid_str <- do.call(paste0, z_grid)
-  z_str <- apply(z, 1, paste0, collapse = "")
 
   ## creating contrast matrices
   g <- expand.grid(rep(list(c(1, -1)), times = K))
