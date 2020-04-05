@@ -22,19 +22,19 @@ formula must match.}
 \item{level}{the confidence level required.}
 }
 \value{
-A list of class \code{iv_finite_factorial} that contains the following
-  components: 
+A list of class \code{iv_finite_factorial} that contains the
+following components:
 \item{tau}{a vector of estimated effect ratios for each factor.}
 \item{tau_cis}{a matrix of confidence intervals for each effect
-  ratio. This matrix has 4 columns because it is possible to have
-  disjoint confidence intervals in this method.}
+ratio. This matrix has 4 columns because it is possible to have
+disjoint confidence intervals in this method.}
 \item{tau_y}{a vector of the estimated effects on the outcome.}
 \item{v_tau_y}{the estimated sample variances of the effects on
-  the outcome.}
+the outcome.}
 \item{tau_d}{a vector of the estimated effects on treatment
-  uptake.} 
+uptake.}
 \item{v_tau_y}{the estimated sample variances of the effects on
-  treatment uptake.}
+treatment uptake.}
 \item{level}{the confidence level of \code{tau_cis}.}
 }
 \description{
@@ -63,7 +63,7 @@ joint
 }
 \references{
 Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
-  Factorial Experiments." Working paper.
+Factorial Experiments." Working paper.
 }
 \author{
 Matt Blackwell

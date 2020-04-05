@@ -9,7 +9,9 @@ Authors@R:
            comment = c(ORCID = "0000-0002-3689-9527"))
 Description: Implements instrumental variable estimators for 2^K factorial experiments with noncompliance.
 Imports: stats
+Suggests: tibble, dplyr
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
+Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.0.2

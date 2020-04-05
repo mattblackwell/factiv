@@ -4,22 +4,22 @@
 ##' assignment on the outcome to the effect of treatment assignment on
 ##' treatment uptake in 2^K factorial experiments. The approach uses
 ##' finite sample asymptotic inference to generate confidence
-##' intervals. 
+##' intervals.
 ##'
-##' 
+##'
 ##' @title Finite-Sample IV Estimation of 2^K Factorial Design
 ##' @param formula formula specification of the factorial design with
 ##'   noncompliance. The right-hand side of the formula should have
-##'   two components separated by the \code{|} symbol, with the first
+##'   two components separated by the `|` symbol, with the first
 ##'   component containing the K binary treatment variables and the
 ##'   second component containing the K binary instruments associated
 ##'   with each treatment variable. The order of the variables in the
-##'   formula must match. 
-##' @param data a data.frame on which to apply the \code{formula}.
+##'   formula must match.
+##' @param data a data.frame on which to apply the `formula`.
 ##' @param subset subset of the data to pass to estimation.
 ##' @param level the confidence level required.
-##' @return A list of class \code{iv_finite_factorial} that contains the following
-##'   components: 
+##' @return A list of class `iv_finite_factorial` that contains the
+##' following components:
 ##' \item{tau}{a vector of estimated effect ratios for each factor.}
 ##' \item{tau_cis}{a matrix of confidence intervals for each effect
 ##'   ratio. This matrix has 4 columns because it is possible to have
@@ -28,12 +28,12 @@
 ##' \item{v_tau_y}{the estimated sample variances of the effects on
 ##'   the outcome.}
 ##' \item{tau_d}{a vector of the estimated effects on treatment
-##'   uptake.} 
+##'   uptake.}
 ##' \item{v_tau_y}{the estimated sample variances of the effects on
 ##'   treatment uptake.}
-##' \item{level}{the confidence level of \code{tau_cis}.}
+##' \item{level}{the confidence level of `tau_cis`.}
 ##' @author Matt Blackwell
-##' @references 
+##' @references
 ##'
 ##' Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
 ##'   Factorial Experiments." Working paper.
@@ -50,7 +50,7 @@
 ##'   inperson_rand + phone_rand, data = newhaven)
 ##'
 ##' joint
-##' 
+##'
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
@@ -100,7 +100,7 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   K <- dim(z)[2]
   N <- length(y)
   ways <- K
-  
+
   dz_vals <- rep(list(c(1, 0)), 2 * K)
   dd_grid <- expand.grid(dz_vals)[, 1:K]
   zz_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
@@ -131,7 +131,7 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
         colnames(contr_int)[j] <- paste0(colnames(z)[combs[, j]],
                                          collapse = ":")
         fact_comps <- rowSums(ps_grid[, combs[, j]] == rep("c", k)) == k
-        Vk[j, fact_comps] <- 1        
+        Vk[j, fact_comps] <- 1
       }
       g <- cbind(g, contr_int)
       V <- rbind(V, Vk)
@@ -139,7 +139,7 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   }
   g_J <- g[,n_eff]
   G_J <- diag(g_J)
-  
+
   g <- g / 2 ^ (K - 1)
   A <- matrix(1, nrow = nrow(dd_grid), ncol = nrow(ps_grid))
   for (k in 1:K) {
@@ -168,9 +168,9 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   Q_z <- array(0, dim = c(3 * n_eff - 1, 2 * J, J))
   vcv <- matrix(0, ncol = 3 * n_eff - 1, nrow = 3 * n_eff - 1)
   theta <- rep(0, times = 3 * n_eff - 1)
-  t_ind <- 1:n_eff
-  tc_ind <- n_eff + 1:(n_eff - 1)
-  d_ind <- 2 * n_eff - 1 + 1:n_eff
+  t_ind <- 1:(n_eff - 1)
+  tc_ind <- c(n_eff:(2 * n_eff - 1))
+  d_ind <- (2 * n_eff):(3 * n_eff - 1)
 
   for (j in 1:J) {
     jj <- which(z_str == z_grid_str[j])
@@ -178,8 +178,8 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
     Rbar[, j] <- colMeans(R[jj, ])
     s_z[,, j] <- var(cbind(H[jj, ], R[jj, ]))
     this_A <- Aw[, which(zz_str_grid == z_grid_str[j])]
-    this_tc <- t(g[,-n_eff]) %*% G_J * g_J[j]
-    Q_z[t_ind, 1:J, j] <- unlist(g[j, ])
+    this_tc <- t(g[,]) %*% G_J * g_J[j]
+    Q_z[t_ind, 1:J, j] <- unlist(g[j, -n_eff])
     Q_z[t_ind, -(1:J), j] <- 0
     Q_z[tc_ind, 1:J, j] <- this_tc
     Q_z[tc_ind, -(1:J), j] <- 0
@@ -190,33 +190,39 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   }
   # Create science matrices -----------------------------
 
-  
-  tau <- theta[t_ind]
-  tau_c <- theta[tc_ind]
-  delta <- theta[d_ind] ##Aw %*% c(Dbar)
+  out <- list()
+  out$num_ind <- c(t_ind, tc_ind)
+  out$den_ind <- c(d_ind[-n_eff], rep(d_ind[n_eff], times = length(tc_ind)))
+  eff_names <- c(colnames(g)[-n_eff], colnames(g))
+  tau_cis <- fieller_cis(theta, vcv, out$num_ind, out$den_ind, eff_names, level)
 
-  phi <- tau / delta
-  gamma <- tau_c / delta[n_eff]
-  
-  v_tau <- diag(vcv)[t_ind]
-  v_delta <- diag(vcv)[d_ind]
-  c_tau_delta <- diag(vcv[t_ind, d_ind])
-  v_tau_c <- diag(vcv)[tc_ind]
-  v_delta_c <- rep(v_delta[n_eff], times = length(gamma))
-  c_tau_delta_c <- c(vcv[tc_ind, d_ind[n_eff]])
-  
-  names(phi) <- names(tau) <- names(delta) <- colnames(g)
-  names(v_tau) <- names(v_delta) <- names(c_tau_delta) <- colnames(g)
-  names(tau_c) <- names(gamma) <- colnames(g)[-n_eff]
-  
+  taus <- theta[out$num_ind] / theta[out$den_ind]
+
+  out$mcafe_est <- taus[t_ind]
+  out$scafe_est <- taus[tc_ind]
+
+  names(out$mcafe_est) <- eff_names[t_ind]
+  names(out$scafe_est) <- eff_names[tc_ind]
+
+  out$mcafe_cis <- tau_cis[t_ind, ]
+  out$scafe_cis <- tau_cis[tc_ind, ]
+  out$level <- level
+  out$theta <- theta
+  out$vcov <- vcv
+  return(out)
+}
+
+fieller_cis <- function(theta, vcv, num_inds, den_inds, eff_names, level) {
   alpha <- (1 - level) / 2
   qq <- qnorm(alpha)
+  K <- length(num_inds)
+  
+  num <- theta[num_inds]
+  den <- theta[den_inds]
+  v_num <- diag(vcv)[num_inds]
+  v_den <- diag(vcv)[den_inds]
+  c_num_den <- diag(vcv[num_inds, den_inds])
 
-  num <- c(tau, tau_c)
-  den <- c(delta, rep(delta[n_eff], length(tau_c)))
-  v_num <- c(v_tau, v_tau_c)
-  v_den <- c(v_delta, v_delta_c)
-  c_num_den <- c(c_tau_delta, c_tau_delta_c)
   aa <- den ^ 2 - qq ^ 2 * v_den
   bb <- -2 * (den * num - qq ^ 2 * c_num_den)
   cc <- c(num ^ 2 - qq ^ 2 * v_num)
@@ -237,20 +243,9 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   tau_cis[disjoint, 1] <- -Inf
   tau_cis[disjoint, 4] <- Inf
   tau_cis[disjoint, 2:3] <- cbind(cntr + moe, cntr - moe)[disjoint, ]
-  rownames(tau_cis) <- c(names(phi), names(gamma))
+  rownames(tau_cis) <- eff_names
   colnames(tau_cis) <- c("ci_1_lower", "ci_1_upper", "ci_2_lower", "ci_2_upper")
-  mcafe_cis <- tau_cis[t_ind,]
-  scafe_cis <- tau_cis[tc_ind,]
-  mcafe_est <- cbind(tau, delta, phi)
-  rownames(mcafe_est) <- names(phi)
-  colnames(mcafe_est) <- c("itt_y", "itt_d", "mcafe")
-  scafe_est <- cbind(tau_c, rep(delta[n_eff], length(tau_c)), gamma)
-  rownames(scafe_est) <- names(gamma)
-  colnames(scafe_est) <- c("itt_y", "pr_joint_c", "scafe")
-
-  return(list(mcafe_est = mcafe_est, scafe_est = scafe_est,
-              mcafe_cis = mcafe_cis, scafe_cis = scafe_cis,
-              theta = theta, vcov = vcv, level = level))
+  return(tau_cis)
 }
 
 #' @export
@@ -271,10 +266,10 @@ print.iv_finite_factorial <- function(x, ...) {
 summary.iv_finite_factorial <- function(x, ...) {
   cat("\nCall:\n")
   print(x$call)
-  
-  
+
+
   cis <- rbind(x$mcafe_cis, x$scafe_cis)
-  mcafe_out <- cbind(x$mcafe_est[,"mcafe"], x$mcafe_cis)
+  mcafe_out <- cbind(x$mcafe_est, x$mcafe_cis)
   perc <- paste0(format(100 * x$level, trim = TRUE, scientific = FALSE,
                         digits = 3), "%")
   ci1 <- apply(format(cis[, 1:2], digits = 3),
@@ -291,16 +286,16 @@ summary.iv_finite_factorial <- function(x, ...) {
   mcafe_ci <- ci1[1:nrow(x$mcafe_cis)]
   scafe_ci <- ci1[-(1:nrow(x$mcafe_cis))]
   cat("\nMarginalized-complier factorial effects:\n")
-  mcafe_out <- cbind(format(x$mcafe_est[,3], digits = 3), mcafe_ci)
-  
+  mcafe_out <- cbind(format(x$mcafe_est, digits = 3), mcafe_ci)
+
   colnames(mcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(mcafe_out) <- rownames(x$mcafe_est)
+  rownames(mcafe_out) <- names(x$mcafe_est)
   print(mcafe_out, quote = FALSE)
 
   cat("\nSupercomplier factorial effects:\n")
-  scafe_out <- cbind(format(x$scafe_est[,3], digits = 3), scafe_ci)
+  scafe_out <- cbind(format(x$scafe_est, digits = 3), scafe_ci)
   colnames(scafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(scafe_out) <- rownames(x$scafe_est)
+  rownames(scafe_out) <- names(x$scafe_est)
   print(scafe_out, quote = FALSE)
 
   invisible(x)
@@ -309,13 +304,13 @@ summary.iv_finite_factorial <- function(x, ...) {
 calculate_rho_hat <- function(d, z) {
   K <- dim(d)[2]
   N <- dim(d)[1]
-  
+
   dz_vals <- rep(list(c(1, 0)), 2 * K)
   ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
   d_grid <- expand.grid(dz_vals)[, 1:K]
   z_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
   R <- nrow(z_grid)
-  
+
   d_grid_str <- do.call(paste0, d_grid)
   z_grid_str <- do.call(paste0, z_grid)
   Dtilde <- matrix(0, nrow = N, ncol = R)
@@ -339,8 +334,10 @@ calculate_rho_hat <- function(d, z) {
   rho <- rep(NA, times = nrow(ps_grid))
   names(rho) <- colnames(A)
   f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
-  
+
   Dnorm <- Ztilde * sweep(Dtilde, 2, f_dz)
   s_dz <- colSums(Dorm ^ 2) / colSums(Ztilde)
   return(list(est = f_dz, Ztilde = Ztilde, Dtilde = Dtilde, s_dz = s_dz))
 }
+
+
