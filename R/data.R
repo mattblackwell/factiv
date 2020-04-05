@@ -7,7 +7,7 @@
 #' factorial design with noncompliance on both factors. This is the
 #' subset of the subjects who lived in a single-person household and
 #' were not randomized to receive get-out-the-vote mailers. Blackwell
-#' (2017) analyzed the full data adjusting for noncompliance. 
+#' (2017) analyzed the full data adjusting for noncompliance.
 #'
 #' @docType data
 #' @name newhaven

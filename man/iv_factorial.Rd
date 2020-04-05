@@ -27,22 +27,21 @@ formula must match.}
 }
 \value{
 A list of class \code{iv_factorial} that contains the following
-  components: 
+components:
 \item{rho}{vector of estimated compliance class
-  probabilities.}
+probabilities.}
 \item{psi}{vector of the estimated conditional mean of the outcome
-  within the compliance classes.}
-\item{init}{list of two vectors, with the initial starting values
-  for the GMM estimation based on a just-identified estimation.}
+within the compliance classes.}
 \item{vcov}{estimated asymptotic variance matrix of the combined
-  \code{rho} and \code{psi} parameters.}
+\code{rho}  and \code{psi} parameters.}
 \item{scafe_est}{vector of estimated main effects of each factor among
-  supercompliers.}
+supercompliers.}
 \item{scafe_se}{vector of estimated standard errors for the
-  estimated effects in \code{tau}.}
+estimated effects in \code{tau}.}
 \item{scafe_cis}{a matrix of confidence intervals for the SCAFE
 estimates.}
-\item{level}{the confidence level of \code{scafe_cis}.}
+\item{level}{the confidence level of the returned confience
+intervals.}
 }
 \description{
 Estimates principal stratum-specific effects and interactions in a
@@ -55,13 +54,12 @@ monotonicity assumption is assumed for both treatment-instrument
 pairs, along with treatment exclusion. See Blackwell (2017) for
 more details on those assumptions.
 
-
 The procedure uses iterative generalized method of moments (GMM)
 to  estimate both the proportions of each compliance class (also
 known as principal strata) and the average potential outcomes
 within those classes. It also provides estimates of several
 one-way, joint, and interactive treatment effects within these
-classes. 
+classes.
 
 Under the above assumptions, the compliance classes are the
 product of the compliance classes for each treatment-instrument
@@ -84,13 +82,13 @@ summary(out)
 }
 \references{
 Matthew Blackwell (2017) Instrumental Variable Methods
-  for Conditional Effects and Causal Interaction in Voter
-  Mobilization Experiments, Journal of the American Statistical
-  Association, 112:518, 590-599,
-  \url{https://doi.org/10.1080/01621459.2016.1246363}
+for Conditional Effects and Causal Interaction in Voter
+Mobilization Experiments, Journal of the American Statistical
+Association, 112:518, 590-599,
+\url{https://doi.org/10.1080/01621459.2016.1246363}
 
 Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
-  Factorial Experiments." Working paper.
+Factorial Experiments." Working paper.
 }
 \author{
 Matt Blackwell

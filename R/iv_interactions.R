@@ -13,7 +13,7 @@
 ##' known as principal strata) and the average potential outcomes
 ##' within those classes. It also provides estimates of several
 ##' one-way, joint, and interactive treatment effects within these
-##' classes. 
+##' classes.
 ##'
 ##' Under the above assumptions, the compliance classes are the
 ##' product of the compliance classes for each treatment-instrument
@@ -23,43 +23,44 @@
 ##' \code{"cn"} is the class that would comply with the first
 ##' treatment and never take the second treatment. Finally, note that
 ##' treatment effects are only well-defined for compliance classes for
-##' which there is compliance on at least one treatment. 
-##' 
+##' which there is compliance on at least one treatment.
+##'
 ##' @title IV Estimation of 2^K Factorial Design
 ##' @param formula formula specification of the factorial design with
 ##'   noncompliance. The right-hand side of the formula should have
-##'   two components separated by the \code{|} symbol, with the first
+##'   two components separated by the `|` symbol, with the first
 ##'   component containing the K binary treatment variables and the
 ##'   second component containing the K binary instruments associated
 ##'   with each treatment variable. The order of the variables in the
-##'   formula must match. 
-##' @param data A data.frame on which to apply the \code{formula}.
+##'   formula must match.
+##' @param data A data.frame on which to apply the `formula`.
 ##' @param subset subset of the data to pass to estimation.
 ##' @param method character indiciating if the estimator should be
-##' \code{"lm"} using the least squares approach (default) or
-##' \code{"cmd"} to estimate via efficent minimum distance estimator. 
+##' `"lm"` using the least squares approach (default) or
+##' `"cmd"` to estimate via efficent minimum distance estimator.
 ##' @param level the confidence level required.
-##' @return A list of class \code{iv_factorial} that contains the following
-##'   components: 
+##' @return A list of class `iv_factorial` that contains the following
+##'   components:
 ##' \item{rho}{vector of estimated compliance class
 ##'   probabilities.}
 ##' \item{psi}{vector of the estimated conditional mean of the outcome
 ##'   within the compliance classes.}
 ##' \item{vcov}{estimated asymptotic variance matrix of the combined
-##'   \code{rho} and \code{psi} parameters.}
+##'   `rho`  and `psi` parameters.}
 ##' \item{scafe_est}{vector of estimated main effects of each factor among
 ##'   supercompliers.}
 ##' \item{scafe_se}{vector of estimated standard errors for the
-##'   estimated effects in \code{tau}.}
+##'   estimated effects in `tau`.}
 ##' \item{scafe_cis}{a matrix of confidence intervals for the SCAFE
 ##' estimates.}
-##' \item{level}{the confidence level of \code{scafe_cis}.}
+##' \item{level}{the confidence level of the returned confience
+##' intervals.}
 ##' @author Matt Blackwell
 ##' @references Matthew Blackwell (2017) Instrumental Variable Methods
 ##'   for Conditional Effects and Causal Interaction in Voter
 ##'   Mobilization Experiments, Journal of the American Statistical
 ##'   Association, 112:518, 590-599,
-##'   \url{https://doi.org/10.1080/01621459.2016.1246363}
+##'   <https://doi.org/10.1080/01621459.2016.1246363>
 ##'
 ##' Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
 ##'   Factorial Experiments." Working paper.
@@ -71,7 +72,7 @@
 ##'   + phone_rand, data = newhaven)
 ##'
 ##' summary(out)
-##' 
+##'
 ##' @export
 ##' @importFrom stats model.matrix model.response
 
@@ -133,7 +134,7 @@ iv_factorial <- function(formula, data, subset, method = "lm", level = 0.95) {
   rownames(out$scafe_cis) <- names(out$scafe_est)
   colnames(out$scafe_cis) <- c("ci_lower", "ci_upper")
   rownames(out$mcafe_cis) <- names(out$mcafe_est)
-  colnames(out$mcafe_cis) <- c("ci_lower", "ci_upper")  
+  colnames(out$mcafe_cis) <- c("ci_lower", "ci_upper")
 
   out$scafe_se[out$scafe_se == 0] <- NA
   out$mcafe_se[out$mcafe_se == 0] <- NA
@@ -151,7 +152,7 @@ factiv_lm_fit <- function(y, d, z) {
   N <- dim(d)[1]
   J <- 2 ^ K
   if (K != dim(z)[2]) stop("d/z dims do not match")
-  
+
   dz_vals <- rep(list(c(1, 0)), 2 * K)
   ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
   dz_d_grid <- expand.grid(dz_vals)[, 1:K]
@@ -160,7 +161,7 @@ factiv_lm_fit <- function(y, d, z) {
   dz_d_grid_str <- do.call(paste0, dz_d_grid)
   ps_type <- 2 + dz_z_grid - dz_d_grid + 2 * dz_d_grid * dz_z_grid
   ps_dict <- list("a", c("n", "c"), "n", c("a", "c"))
-  
+
   A <- matrix(1, nrow = nrow(dz_d_grid), ncol = nrow(ps_grid))
   for (k in 1:K) {
     k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
@@ -169,7 +170,7 @@ factiv_lm_fit <- function(y, d, z) {
   colnames(A) <- do.call(paste0, ps_grid)
   rownames(A) <- paste0(dz_d_grid_str, "_", dz_z_grid_str)
   Aw <- solve(crossprod(A)) %*% t(A)
-  
+
   B <- matrix(0, nrow = nrow(dz_d_grid), ncol = nrow(dz_d_grid))
   rownames(B) <- rownames(A)
   hold <- list(c("n", "c"), c("a", "c"))
@@ -225,7 +226,7 @@ factiv_lm_fit <- function(y, d, z) {
   names(psi) <- colnames(B)
   rownames(vcv) <- c(colnames(A), colnames(B))
   colnames(vcv) <- c(colnames(A), colnames(B))
-  
+
   return(list(A = A, B = B, Hbar = Hbar, Rbar = Rbar, rho = rho,
               psi = psi, vcov = vcv))
 }
@@ -236,7 +237,7 @@ factiv_cmd_fit <- function(y, d, z) {
   N <- dim(d)[1]
   J <- 2 ^ K
   if (K != dim(z)[2]) stop("d/z dims do not match")
-  
+
   dz_vals <- rep(list(c(1, 0)), 2 * K)
   ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
   dz_d_grid <- expand.grid(dz_vals)[, 1:K]
@@ -245,7 +246,7 @@ factiv_cmd_fit <- function(y, d, z) {
   dz_d_grid_str <- do.call(paste0, dz_d_grid)
   ps_type <- 2 + dz_z_grid - dz_d_grid + 2 * dz_d_grid * dz_z_grid
   ps_dict <- list("a", c("n", "c"), "n", c("a", "c"))
-  
+
   A <- matrix(1, nrow = nrow(dz_d_grid), ncol = nrow(ps_grid))
   for (k in 1:K) {
     k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
@@ -258,7 +259,7 @@ factiv_cmd_fit <- function(y, d, z) {
   drop_par <- grep(paste0(rep("n", times = K), collapse = ""), colnames(A))
   AA <- A[-drop_mom, -drop_par]
   Aw <- solve(crossprod(AA)) %*% t(AA)
-  
+
   B <- matrix(0, nrow = nrow(dz_d_grid), ncol = nrow(dz_d_grid))
   rownames(B) <- rownames(A)
   hold <- list(c("n", "c"), c("a", "c"))
@@ -321,7 +322,7 @@ factiv_cmd_fit <- function(y, d, z) {
   Aw_opt <- solve(crossprod(AA, solve(HR_var[1:Ar, 1:Ar]) %*% AA)) %*%
     t(AA) %*% solve(HR_var[1:Ar,1:Ar])
   Bw_opt <- solve(crossprod(B, solve(HR_var[-(1:Ar),-(1:Ar)]) %*% B)) %*%
-      t(B) %*% solve(HR_var[-(1:Ar),-(1:Ar)]) 
+      t(B) %*% solve(HR_var[-(1:Ar),-(1:Ar)])
   vcv2 <- matrix(0, ncol = tot_p, nrow = tot_p)
   theta2 <- rep(0, times = tot_p)
   for (j in 1:J) {
@@ -374,7 +375,7 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
   names(num_c) <- do.call(paste0, ps_grid)
   psi_adj <- c(rep(0, times = length(rho)),
                num_c[psi_ps_grid])
-  
+
   g_s_rho[paste0(rep("c", K), collapse = ""),] <- 1
   scomps_psi <- grep(paste0(c("_", rep("c", K)), collapse = ""),
                      rownames(vcv))
@@ -384,7 +385,7 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
     this_comb <- comb_list[[j]]
     k <- length(this_comb)
     eff_labs[j] <- paste0(var_names[this_comb], collapse = ":")
-    
+
     this_contr <- g[, this_comb, drop = FALSE]
     this_contr <- apply(this_contr, 1, prod)
     mcomps <- rowSums(ps_grid[, this_comb, drop = FALSE] == rep("c", k)) == k
@@ -398,8 +399,8 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
   colnames(g_m_psi) <- colnames(g_s_psi) <- eff_labs
   colnames(g_m_rho) <- colnames(g_s_rho) <- eff_labs
   g_m_psi <- g_m_psi / 2 ^ (psi_adj - 1)
-  g_s_psi <- g_s_psi / 2 ^ (K-1)
-  
+  g_s_psi <- g_s_psi / 2 ^ (K - 1)
+
   theta <- c(rho, psi)
   m_num <- c(t(g_m_psi) %*% theta)
   m_den <- c(t(g_m_rho) %*% theta)
@@ -422,6 +423,13 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
     2 * (s_num / s_den ^ 3) * s_cov
   mcafe_se <- sqrt(mcafe_var)
   scafe_se <- sqrt(scafe_var)
+
+  names(scafe_est) <- names(scafe_se) <- eff_labs
+  names(mcafe_est) <- names(mcafe_se) <- eff_labs
+
+  ## last effect is really an scafe
+  mcafe_est <- mcafe_est[-J]
+  mcafe_se <- mcafe_se[-J]
   return(list(mcafe_est = mcafe_est, mcafe_se = mcafe_se,
               scafe_est = scafe_est, scafe_se = scafe_se))
 }
@@ -464,4 +472,43 @@ print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") -
       formatC(x$c_prob, digits), "\tSE = ", formatC(x$c_prob_se, digits))
   cat("\n")
   invisible(x)
+}
+
+
+##' Tidy summarizes information about the components of a model.
+##'
+##'
+##' @title Tidy an iv_factorial object
+##' @param x An `iv_factorial` object produced by a call to [factiv::iv_factorial()]
+##' @param conf.int Logical indicating whether or not to include a
+##' confidence interval in the tidied output. Defaults to `FALSE`
+##' @param conf.level The confidence level to use for the confidence
+##' interval if `conf.int = TRUE`. Must be strictly greater than 0
+##' and less than 1. Defaults to 0.95, which corresponds to a 95
+##' percent confidence interval.
+##' @param ... Additional arguments. Not used. Needed to match generic
+##' signature only.
+##' @return
+##' @author Matt Blackwell
+##' @export
+tidy.iv_factorial <- function(x, conf.int = FALSE, conf.level = 0.95, ...) {
+
+  tms <- c(names(x$mcafe_est), names(x$scafe_est))
+  estimands <- c(rep("MCAFE", length(x$mcafe_est)),
+                 rep("SCAFE", length(x$scafe_est)))
+  ests <- c(x$mcafe_est, x$scafe_est)
+  ses <- c(x$mcafe_se, x$scafe_se)
+
+  ret <- tibble::tibble(term = tms,
+                        estimand = estimands,
+                        estimate = ests,
+                        std.error = ses)
+  if (conf.int) {
+    alpha <- (1 - conf.level) / 2
+    qq <- abs(qnorm(alpha))
+    ret <- dplyr::mutate(ret,
+                         conf.low = estimate - qq * std.error,
+                         conf.high = estimate + qq * std.error)
+  }
+  return(ret)
 }

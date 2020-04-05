@@ -301,43 +301,34 @@ summary.iv_finite_factorial <- function(x, ...) {
   invisible(x)
 }
 
-calculate_rho_hat <- function(d, z) {
-  K <- dim(d)[2]
-  N <- dim(d)[1]
 
-  dz_vals <- rep(list(c(1, 0)), 2 * K)
-  ps_grid <- expand.grid(rep(list(c("a", "n", "c")), K))
-  d_grid <- expand.grid(dz_vals)[, 1:K]
-  z_grid <- expand.grid(dz_vals)[, (K + 1):(2 * K)]
-  R <- nrow(z_grid)
+##' Tidy summarizes information about the components of a model.
+##'
+##'
+##' @title Tidy an iv_finite_factorial object
+##' @param x An `iv_factorial` object produced by a call to
+##' [factiv::iv_finite_factorial()]
+##' @param conf.level The confidence level to use for the confidence
+##' interval. Must be strictly greater than 0 and less than 1.
+##' Defaults to  0.95, which corresponds to a 95
+##' percent confidence interval.
+##' @param ... Additional arguments. Not used. Needed to match generic
+##' signature only.
+##' @return
+##' @author Matt Blackwell
+##' @export
+tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
 
-  d_grid_str <- do.call(paste0, d_grid)
-  z_grid_str <- do.call(paste0, z_grid)
-  Dtilde <- matrix(0, nrow = N, ncol = R)
-  Ztilde <- matrix(0, nrow = N, ncol = R)
-  for (r in 1:R) {
-    Dtilde[d_str == d_grid_str[r], r] <- 1
-    Ztilde[z_str == z_grid_str[r], r] <- 1
-  }
-
-  d_grid <- expand.grid(rep(list(c(1,0)), times = k))
-  d_grid_str <- do.call(paste0, d_grid)
-  ps_type <- 2 + z_grid - d_grid + 2 * d_grid * z_grid
-  ps_dict <- list("a", c("n", "c"), "n", c("a", "c"))
-  A <- matrix(1, nrow = nrow(d_grid), ncol = nrow(ps_grid))
-  for (k in 1:K) {
-    k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
-    A <- A * t(k_mat)
-  }
-  colnames(A) <- do.call(paste0, ps_grid)
-  rownames(A) <- paste0(do.call(paste0, d_grid), "_", do.call(paste0, z_grid))
-  rho <- rep(NA, times = nrow(ps_grid))
-  names(rho) <- colnames(A)
-  f_dz <- colSums(Ztilde * Dtilde) / colSums(Ztilde)
-
-  Dnorm <- Ztilde * sweep(Dtilde, 2, f_dz)
-  s_dz <- colSums(Dorm ^ 2) / colSums(Ztilde)
-  return(list(est = f_dz, Ztilde = Ztilde, Dtilde = Dtilde, s_dz = s_dz))
+  tms <- c(names(x$mcafe_est), names(x$scafe_est))
+  estimands <- c(rep("MCAFE", length(x$mcafe_est)),
+                 rep("SCAFE", length(x$scafe_est)))
+  ests <- c(x$mcafe_est, x$scafe_est)
+  cis <- fieller_cis(x$theta, x$vcov, x$num_ind, x$den_ind, tms,
+                     level = conf.level)
+  ret <- tibble::tibble(term = tms,
+                        estimand = estimands,
+                        estimate = ests)
+  ret <- dplyr::bind_cols(ret, as.data.frame(cis))
+  return(ret)
 }
-
 
