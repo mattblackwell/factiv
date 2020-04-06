@@ -86,10 +86,10 @@ iv_finite_factorial <- function(formula, data, subset, level = 0.95) {
   mf <- eval(mf, parent.frame())
   mt <- attr(mf, "terms") # terms object
 
-  Y <- model.response(mf, "numeric")
-  D <- model.matrix(mt_d, mf)
-  Z <- model.matrix(mt_z, mf)
-  out <- iv_finite_fit(Y, D, Z, level = level)
+  y <- model.response(mf, "numeric")
+  d <- model.matrix(mt_d, mf)
+  z <- model.matrix(mt_z, mf)
+  out <- iv_finite_fit(y, d, z, level = level)
   out$call <- cl
   out$terms <- mt
   class(out) <- "iv_finite_factorial"
@@ -115,21 +115,27 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   n_eff <- sum(choose(K, 1:ways))
   V <- matrix(0, ncol = 3 ^ K, nrow = K)
   colnames(V) <-  do.call(paste0, ps_grid)
+  eff_names <- rep(NA, n_eff)
+  eff_names[1:K] <- colnames(d)
   for (k in 1:K) {
     cvec <- which(ps_grid[, k] == "c")
     V[k, cvec] <- 1
   }
+  count <- K + 1
   if (ways > 1) {
     for (k in 2:ways) {
       combs <- combn(1:K, k)
       contr_int <- matrix(NA, nrow = J, ncol = ncol(combs))
       colnames(contr_int) <- rep("", ncol(combs))
       Vk <- matrix(0, nrow = ncol(combs), ncol = 3 ^ K)
-      for (j in 1:ncol(combs)) {
+      for (j in seq_len(ncol(combs))) {
         this_comb <- g[, combs[, j], drop = FALSE]
         contr_int[, j] <- apply(this_comb, 1, prod)
         colnames(contr_int)[j] <- paste0(colnames(z)[combs[, j]],
                                          collapse = ":")
+        eff_names[count] <- paste0(colnames(d)[combs[, j]],
+                                   collapse = ":")
+        count <- count + 1
         fact_comps <- rowSums(ps_grid[, combs[, j]] == rep("c", k)) == k
         Vk[j, fact_comps] <- 1
       }
@@ -137,13 +143,14 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
       V <- rbind(V, Vk)
     }
   }
-  g_J <- g[,n_eff]
+  g_J <- g[, n_eff]
   G_J <- diag(g_J)
 
   g <- g / 2 ^ (K - 1)
   A <- matrix(1, nrow = nrow(dd_grid), ncol = nrow(ps_grid))
   for (k in 1:K) {
-    k_mat <- sapply(ps_dict[ps_type[,k]], function(x) 1 * (ps_grid[,k] %in% x))
+    k_mat <- sapply(ps_dict[ps_type[, k]],
+                    function(x) 1 * (ps_grid[, k] %in% x))
     A <- A * t(k_mat)
   }
   colnames(A) <- do.call(paste0, ps_grid)
@@ -174,26 +181,27 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
 
   for (j in 1:J) {
     jj <- which(z_str == z_grid_str[j])
+    n_j <- length(jj)
     Hbar[, j] <- colMeans(H[jj, ])
     Rbar[, j] <- colMeans(R[jj, ])
-    s_z[,, j] <- var(cbind(H[jj, ], R[jj, ]))
+    s_z[, , j] <- var(cbind(H[jj, ], R[jj, ]))
     this_A <- Aw[, which(zz_str_grid == z_grid_str[j])]
-    this_tc <- t(g[,]) %*% G_J * g_J[j]
+    this_tc <- t(g) %*% G_J * g_J[j]
     Q_z[t_ind, 1:J, j] <- unlist(g[j, -n_eff])
-    Q_z[t_ind, -(1:J), j] <- 0
+    Q_z[t_ind, -c(1:J), j] <- 0
     Q_z[tc_ind, 1:J, j] <- this_tc
-    Q_z[tc_ind, -(1:J), j] <- 0
+    Q_z[tc_ind, -c(1:J), j] <- 0
     Q_z[d_ind, 1:J, j] <- 0
-    Q_z[d_ind, -(1:J), j] <- this_A
-    theta <- theta + Q_z[, , j] %*% c(Hbar[,j], Rbar[,j])
-    vcv <- vcv + (1 / length(jj)) * (Q_z[,, j] %*% s_z[,, j] %*% t(Q_z[,, j]))
+    Q_z[d_ind, -c(1:J), j] <- this_A
+    theta <- theta + Q_z[, , j] %*% c(Hbar[, j], Rbar[, j])
+    vcv <- vcv + (1 / n_j) * (Q_z[, , j] %*% s_z[, , j] %*% t(Q_z[, , j]))
   }
   # Create science matrices -----------------------------
 
   out <- list()
   out$num_ind <- c(t_ind, tc_ind)
   out$den_ind <- c(d_ind[-n_eff], rep(d_ind[n_eff], times = length(tc_ind)))
-  eff_names <- c(colnames(g)[-n_eff], colnames(g))
+  eff_names <- c(eff_names[-n_eff], eff_names)
   tau_cis <- fieller_cis(theta, vcv, out$num_ind, out$den_ind, eff_names, level)
 
   taus <- theta[out$num_ind] / theta[out$den_ind]
@@ -216,7 +224,7 @@ fieller_cis <- function(theta, vcv, num_inds, den_inds, eff_names, level) {
   alpha <- (1 - level) / 2
   qq <- qnorm(alpha)
   K <- length(num_inds)
-  
+
   num <- theta[num_inds]
   den <- theta[den_inds]
   v_num <- diag(vcv)[num_inds]
@@ -283,8 +291,9 @@ summary.iv_finite_factorial <- function(x, ...) {
     ci1[disj] <- paste(ci1[disj], ci2, sep = " U ")
   }
 
-  mcafe_ci <- ci1[1:nrow(x$mcafe_cis)]
-  scafe_ci <- ci1[-(1:nrow(x$mcafe_cis))]
+  mcafes <- seq_along(x$mcafe_est)
+  mcafe_ci <- ci1[mcafes]
+  scafe_ci <- ci1[-mcafes]
   cat("\nMarginalized-complier factorial effects:\n")
   mcafe_out <- cbind(format(x$mcafe_est, digits = 3), mcafe_ci)
 
@@ -331,4 +340,3 @@ tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
   ret <- dplyr::bind_cols(ret, as.data.frame(cis))
   return(ret)
 }
-
