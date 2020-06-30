@@ -47,11 +47,11 @@
 ##'   within the compliance classes.}
 ##' \item{vcov}{estimated asymptotic variance matrix of the combined
 ##'   `rho`  and `psi` parameters.}
-##' \item{scafe_est}{vector of estimated main effects of each factor among
-##'   supercompliers.}
-##' \item{scafe_se}{vector of estimated standard errors for the
+##' \item{pcafe_est}{vector of estimated main effects of each factor among
+##'   perfect compliers.}
+##' \item{pcafe_se}{vector of estimated standard errors for the
 ##'   estimated effects in `tau`.}
-##' \item{scafe_cis}{a matrix of confidence intervals for the SCAFE
+##' \item{pcafe_cis}{a matrix of confidence intervals for the PCAFE
 ##' estimates.}
 ##' \item{level}{the confidence level of the returned confience
 ##' intervals.}
@@ -118,25 +118,25 @@ iv_factorial <- function(formula, data, subset, method = "lm", level = 0.95) {
     out <- factiv_cmd_fit(Y, D, Z)
   }
   effs <- psi_to_tau(out$psi, out$rho, K, out$vcov, colnames(D))
-  out$scafe_est <- effs$scafe_est
-  out$scafe_se <- effs$scafe_se
+  out$pcafe_est <- effs$pcafe_est
+  out$pcafe_se <- effs$pcafe_se
   out$mcafe_est <- effs$mcafe_est
   out$mcafe_se <- effs$mcafe_se
   out$level <- level
   alpha <- (1 - level) / 2
   qq <- abs(qnorm(alpha))
-  out$scafe_cis <- matrix(NA, nrow = length(out$scafe_est), ncol = 2)
-  out$scafe_cis[, 1] <- out$scafe_est - qq * out$scafe_se
-  out$scafe_cis[, 2] <- out$scafe_est + qq * out$scafe_se
+  out$pcafe_cis <- matrix(NA, nrow = length(out$pcafe_est), ncol = 2)
+  out$pcafe_cis[, 1] <- out$pcafe_est - qq * out$pcafe_se
+  out$pcafe_cis[, 2] <- out$pcafe_est + qq * out$pcafe_se
   out$mcafe_cis <- matrix(NA, nrow = length(out$mcafe_est), ncol = 2)
   out$mcafe_cis[, 1] <- out$mcafe_est - qq * out$mcafe_se
   out$mcafe_cis[, 2] <- out$mcafe_est + qq * out$mcafe_se
-  rownames(out$scafe_cis) <- names(out$scafe_est)
-  colnames(out$scafe_cis) <- c("ci_lower", "ci_upper")
+  rownames(out$pcafe_cis) <- names(out$pcafe_est)
+  colnames(out$pcafe_cis) <- c("ci_lower", "ci_upper")
   rownames(out$mcafe_cis) <- names(out$mcafe_est)
   colnames(out$mcafe_cis) <- c("ci_lower", "ci_upper")
 
-  out$scafe_se[out$scafe_se == 0] <- NA
+  out$pcafe_se[out$pcafe_se == 0] <- NA
   out$mcafe_se[out$mcafe_se == 0] <- NA
   class(out) <- "iv_factorial"
   out$call <- cl
@@ -408,7 +408,7 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
   s_den <- c(t(g_s_rho) %*% theta)
 
   mcafe_est <- m_num / m_den
-  scafe_est <- s_num / s_den
+  pcafe_est <- s_num / s_den
   m_num_var <- diag(t(g_m_psi) %*% vcv %*% g_m_psi)
   s_num_var <- diag(t(g_s_psi) %*% vcv %*% g_s_psi)
   m_den_var <- diag(t(g_m_rho) %*% vcv %*% g_m_rho)
@@ -418,20 +418,20 @@ psi_to_tau <- function(psi, rho, K, vcv, var_names) {
   mcafe_var <- m_den ^ (-2) * m_num_var +
     (m_num ^ 2 / m_den ^ 4) * m_den_var -
     2 * (m_num / m_den ^ 3) * m_cov
-  scafe_var <- s_den ^ (-2) * s_num_var +
+  pcafe_var <- s_den ^ (-2) * s_num_var +
     (s_num ^ 2 / s_den ^ 4) * s_den_var -
     2 * (s_num / s_den ^ 3) * s_cov
   mcafe_se <- sqrt(mcafe_var)
-  scafe_se <- sqrt(scafe_var)
+  pcafe_se <- sqrt(pcafe_var)
 
-  names(scafe_est) <- names(scafe_se) <- eff_labs
+  names(pcafe_est) <- names(pcafe_se) <- eff_labs
   names(mcafe_est) <- names(mcafe_se) <- eff_labs
 
-  ## last effect is really an scafe
+  ## last effect is really an pcafe
   mcafe_est <- mcafe_est[-J]
   mcafe_se <- mcafe_se[-J]
   return(list(mcafe_est = mcafe_est, mcafe_se = mcafe_se,
-              scafe_est = scafe_est, scafe_se = scafe_se))
+              pcafe_est = pcafe_est, pcafe_se = pcafe_se))
 }
 
 all_subsets <- function(x) {
@@ -453,10 +453,10 @@ print.iv_factorial <- function(x, ...) {
 #' @export
 summary.iv_factorial <- function(object, ...) {
   rdf <- object$df.residual
-  tval <- object$scafe_est / object$scafe_se
+  tval <- object$pcafe_est / object$pcafe_se
   pval <- 2 * pt(abs(tval), rdf, lower.tail = FALSE)
   out <- object[c("call", "terms", "vcov")]
-  out$coefficients <- cbind(object$scafe_est, object$scafe_se, tval, pval)
+  out$coefficients <- cbind(object$pcafe_est, object$pcafe_se, tval, pval)
   out$c_prob <- object$rho[length(object$rho)]
   c_pos <- sum(!is.na(object$rho)) - 1
   out$c_prob_se <- sqrt(out$vcov[c_pos, c_pos])
@@ -466,9 +466,9 @@ summary.iv_factorial <- function(object, ...) {
 
 #' @export
 print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
-  cat("\n Main effects among supercompliers:\n")
+  cat("\n Main effects among perfect compliers:\n")
   stats::printCoefmat(x$coefficients, digits = digits)
-  cat("\nEstimated prob. of supercompliers: ",
+  cat("\nEstimated prob. of perfect compliers: ",
       formatC(x$c_prob, digits), "\tSE = ", formatC(x$c_prob_se, digits))
   cat("\n")
   invisible(x)
@@ -493,11 +493,11 @@ print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") -
 ##' @export
 tidy.iv_factorial <- function(x, conf.int = FALSE, conf.level = 0.95, ...) {
 
-  tms <- c(names(x$mcafe_est), names(x$scafe_est))
+  tms <- c(names(x$mcafe_est), names(x$pcafe_est))
   estimands <- c(rep("MCAFE", length(x$mcafe_est)),
-                 rep("SCAFE", length(x$scafe_est)))
-  ests <- c(x$mcafe_est, x$scafe_est)
-  ses <- c(x$mcafe_se, x$scafe_se)
+                 rep("PCAFE", length(x$pcafe_est)))
+  ests <- c(x$mcafe_est, x$pcafe_est)
+  ses <- c(x$mcafe_se, x$pcafe_se)
 
   ret <- tibble::tibble(term = tms,
                         estimand = estimands,

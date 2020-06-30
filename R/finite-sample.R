@@ -207,13 +207,13 @@ iv_finite_fit <- function(y, d, z, level = 0.95) {
   taus <- theta[out$num_ind] / theta[out$den_ind]
 
   out$mcafe_est <- taus[t_ind]
-  out$scafe_est <- taus[tc_ind]
+  out$pcafe_est <- taus[tc_ind]
 
   names(out$mcafe_est) <- eff_names[t_ind]
-  names(out$scafe_est) <- eff_names[tc_ind]
+  names(out$pcafe_est) <- eff_names[tc_ind]
 
   out$mcafe_cis <- tau_cis[t_ind, ]
-  out$scafe_cis <- tau_cis[tc_ind, ]
+  out$pcafe_cis <- tau_cis[tc_ind, ]
   out$level <- level
   out$theta <- theta
   out$vcov <- vcv
@@ -264,8 +264,8 @@ print.iv_finite_factorial <- function(x, ...) {
   cat("\nMarginalized-complier factorial effects:\n")
   print(x$mcafe_est)
 
-  cat("\nSupercomplier factorial effects:\n")
-  print(x$scafe_est)
+  cat("\nPerfect-complier factorial effects:\n")
+  print(x$pcafe_est)
   invisible(x)
 }
 
@@ -276,7 +276,7 @@ summary.iv_finite_factorial <- function(x, ...) {
   print(x$call)
 
 
-  cis <- rbind(x$mcafe_cis, x$scafe_cis)
+  cis <- rbind(x$mcafe_cis, x$pcafe_cis)
   mcafe_out <- cbind(x$mcafe_est, x$mcafe_cis)
   perc <- paste0(format(100 * x$level, trim = TRUE, scientific = FALSE,
                         digits = 3), "%")
@@ -293,7 +293,7 @@ summary.iv_finite_factorial <- function(x, ...) {
 
   mcafes <- seq_along(x$mcafe_est)
   mcafe_ci <- ci1[mcafes]
-  scafe_ci <- ci1[-mcafes]
+  pcafe_ci <- ci1[-mcafes]
   cat("\nMarginalized-complier factorial effects:\n")
   mcafe_out <- cbind(format(x$mcafe_est, digits = 3), mcafe_ci)
 
@@ -301,11 +301,11 @@ summary.iv_finite_factorial <- function(x, ...) {
   rownames(mcafe_out) <- names(x$mcafe_est)
   print(mcafe_out, quote = FALSE)
 
-  cat("\nSupercomplier factorial effects:\n")
-  scafe_out <- cbind(format(x$scafe_est, digits = 3), scafe_ci)
-  colnames(scafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(scafe_out) <- names(x$scafe_est)
-  print(scafe_out, quote = FALSE)
+  cat("\nPerfect-complier factorial effects:\n")
+  pcafe_out <- cbind(format(x$pcafe_est, digits = 3), pcafe_ci)
+  colnames(pcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
+  rownames(pcafe_out) <- names(x$pcafe_est)
+  print(pcafe_out, quote = FALSE)
 
   invisible(x)
 }
@@ -328,10 +328,10 @@ summary.iv_finite_factorial <- function(x, ...) {
 ##' @export
 tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
 
-  tms <- c(names(x$mcafe_est), names(x$scafe_est))
+  tms <- c(names(x$mcafe_est), names(x$pcafe_est))
   estimands <- c(rep("MCAFE", length(x$mcafe_est)),
-                 rep("SCAFE", length(x$scafe_est)))
-  ests <- c(x$mcafe_est, x$scafe_est)
+                 rep("PCAFE", length(x$pcafe_est)))
+  ests <- c(x$mcafe_est, x$pcafe_est)
   cis <- fieller_cis(x$theta, x$vcov, x$num_ind, x$den_ind, tms,
                      level = conf.level)
   ret <- tibble::tibble(term = tms,
