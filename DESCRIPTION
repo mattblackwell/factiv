@@ -2,15 +2,21 @@ Package: factiv
 Title: Instrumental Variables Estimation for 2^K Factorial Experiments
 Version: 0.0.0.9000
 Authors@R: 
-    person(given = "Matthew",
-           family = "Blackwell",
-           role = c("aut", "cre"),
-           email = "mblackwell@gov.harvard.edu",
-           comment = c(ORCID = "0000-0002-3689-9527"))
+    c(person(given = "Matthew",
+             family = "Blackwell",
+             role = c("aut", "cre"),
+             email = "mblackwell@gov.harvard.edu",
+             comment = c(ORCID = "0000-0002-3689-9527")),
+      person(given = "Nicole",
+             family = "Pashley",
+             role = "aut",
+             email = "npashley@g.harvard.edu"))
 Description: Implements instrumental variable estimators for 2^K factorial experiments with noncompliance.
 Imports: stats
 Suggests: tibble, dplyr
 License: GPL (>= 2)
+URL: https://github.com/mattblackwell/factiv
+BugReports: https://github.com/mattblackwell/factiv/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
