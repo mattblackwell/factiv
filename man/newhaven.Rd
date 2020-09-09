@@ -4,7 +4,8 @@
 \name{newhaven}
 \alias{newhaven}
 \title{New Haven Voter Modelization Field Experiment}
-\format{A data frame with 7865 observations and 6 variables:
+\format{
+A data frame with 7865 observations and 6 variables:
 \describe{
 \item{ward}{ward of the residence.}
 \item{turnout_98}{indicator variable for voting in the 1998
@@ -17,7 +18,8 @@ phone canvassing.}
 randomized to receive in-person canvassing.}
 \item{phone_rand}{indicator variable for if the respondent was
 randomized to receive phone canvassing.}
-}}
+}
+}
 \source{
 https://doi.org/10.7910/DVN/Q6CID7
 }

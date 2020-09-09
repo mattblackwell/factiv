@@ -4,11 +4,11 @@
 \alias{tidy.iv_finite_factorial}
 \title{Tidy an iv_finite_factorial object}
 \usage{
-tidy.iv_finite_factorial(x, conf.level = 0.95, ...)
+\method{tidy}{iv_finite_factorial}(x, conf.level = 0.95, ...)
 }
 \arguments{
 \item{x}{An \code{iv_factorial} object produced by a call to
-\code{\link[factiv:iv_finite_factorial]{factiv::iv_finite_factorial()}}}
+\code{\link[=iv_finite_factorial]{iv_finite_factorial()}}}
 
 \item{conf.level}{The confidence level to use for the confidence
 interval. Must be strictly greater than 0 and less than 1.

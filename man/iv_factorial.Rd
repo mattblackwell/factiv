@@ -34,11 +34,11 @@ probabilities.}
 within the compliance classes.}
 \item{vcov}{estimated asymptotic variance matrix of the combined
 \code{rho}  and \code{psi} parameters.}
-\item{scafe_est}{vector of estimated main effects of each factor among
-supercompliers.}
-\item{scafe_se}{vector of estimated standard errors for the
+\item{pcafe_est}{vector of estimated main effects of each factor among
+perfect compliers.}
+\item{pcafe_se}{vector of estimated standard errors for the
 estimated effects in \code{tau}.}
-\item{scafe_cis}{a matrix of confidence intervals for the SCAFE
+\item{pcafe_cis}{a matrix of confidence intervals for the PCAFE
 estimates.}
 \item{level}{the confidence level of the returned confience
 intervals.}

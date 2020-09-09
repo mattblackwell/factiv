@@ -326,6 +326,7 @@ summary.iv_finite_factorial <- function(x, ...) {
 ##' @return
 ##' @author Matt Blackwell
 ##' @export
+
 tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
 
   tms <- c(names(x$mcafe_est), names(x$pcafe_est))
@@ -340,3 +341,8 @@ tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
   ret <- dplyr::bind_cols(ret, as.data.frame(cis))
   return(ret)
 }
+
+
+##' @importFrom generics tidy
+##' @export
+generics::tidy

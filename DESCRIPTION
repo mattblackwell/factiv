@@ -12,7 +12,7 @@ Authors@R:
              role = "aut",
              email = "npashley@g.harvard.edu"))
 Description: Implements instrumental variable estimators for 2^K factorial experiments with noncompliance.
-Imports: stats
+Imports: stats, generics
 Suggests: tibble, dplyr
 License: GPL (>= 2)
 URL: https://github.com/mattblackwell/factiv
@@ -20,4 +20,4 @@ BugReports: https://github.com/mattblackwell/factiv/issues
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.0.2
+RoxygenNote: 7.1.1

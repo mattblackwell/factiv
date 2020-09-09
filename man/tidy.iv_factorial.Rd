@@ -4,10 +4,10 @@
 \alias{tidy.iv_factorial}
 \title{Tidy an iv_factorial object}
 \usage{
-tidy.iv_factorial(x, conf.int = FALSE, conf.level = 0.95, ...)
+\method{tidy}{iv_factorial}(x, conf.int = FALSE, conf.level = 0.95, ...)
 }
 \arguments{
-\item{x}{An \code{iv_factorial} object produced by a call to \code{\link[factiv:iv_factorial]{factiv::iv_factorial()}}}
+\item{x}{An \code{iv_factorial} object produced by a call to \code{\link[=iv_factorial]{iv_factorial()}}}
 
 \item{conf.int}{Logical indicating whether or not to include a
 confidence interval in the tidied output. Defaults to \code{FALSE}}
