@@ -42,7 +42,7 @@ data(newhaven)
 cov_prof <- compliance_profile(~ inperson + phone | inperson_rand
   + phone_rand | age + maj_party + turnout_96, data = newhaven)
 
-cov_prof$raw_table
+cov_prof
 }
 \references{
 Matthew Blackwell and Nicole Pashley (2021) "Noncompliance in

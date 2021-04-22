@@ -52,7 +52,9 @@
 ##' joint
 ##'
 ##' @export
-##' @importFrom stats model.matrix model.response
+##' @importFrom stats model.matrix model.response terms sd var qnorm
+##' pt 
+##' @importFrom utils combn
 
 iv_finite_factorial <- function(formula, data, subset, level = 0.95) {
   cl <- match.call(expand.dots = TRUE)
@@ -271,14 +273,14 @@ print.iv_finite_factorial <- function(x, ...) {
 
 
 #' @export
-summary.iv_finite_factorial <- function(x, ...) {
+summary.iv_finite_factorial <- function(object, ...) {
   cat("\nCall:\n")
-  print(x$call)
+  print(object$call)
 
 
-  cis <- rbind(x$mcafe_cis, x$pcafe_cis)
-  mcafe_out <- cbind(x$mcafe_est, x$mcafe_cis)
-  perc <- paste0(format(100 * x$level, trim = TRUE, scientific = FALSE,
+  cis <- rbind(object$mcafe_cis, object$pcafe_cis)
+  mcafe_out <- cbind(object$mcafe_est, object$mcafe_cis)
+  perc <- paste0(format(100 * object$level, trim = TRUE, scientific = FALSE,
                         digits = 3), "%")
   ci1 <- apply(format(cis[, 1:2], digits = 3),
                1, paste, collapse = ", ", sep = "")
@@ -291,23 +293,23 @@ summary.iv_finite_factorial <- function(x, ...) {
     ci1[disj] <- paste(ci1[disj], ci2, sep = " U ")
   }
 
-  mcafes <- seq_along(x$mcafe_est)
+  mcafes <- seq_along(object$mcafe_est)
   mcafe_ci <- ci1[mcafes]
   pcafe_ci <- ci1[-mcafes]
   cat("\nMarginalized-complier factorial effects:\n")
-  mcafe_out <- cbind(format(x$mcafe_est, digits = 3), mcafe_ci)
+  mcafe_out <- cbind(format(object$mcafe_est, digits = 3), mcafe_ci)
 
   colnames(mcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(mcafe_out) <- names(x$mcafe_est)
+  rownames(mcafe_out) <- names(object$mcafe_est)
   print(mcafe_out, quote = FALSE)
 
   cat("\nPerfect-complier factorial effects:\n")
-  pcafe_out <- cbind(format(x$pcafe_est, digits = 3), pcafe_ci)
+  pcafe_out <- cbind(format(object$pcafe_est, digits = 3), pcafe_ci)
   colnames(pcafe_out) <- c("Estimate", paste0(perc, " Confidence Interval"))
-  rownames(pcafe_out) <- names(x$pcafe_est)
+  rownames(pcafe_out) <- names(object$pcafe_est)
   print(pcafe_out, quote = FALSE)
 
-  invisible(x)
+  invisible(object)
 }
 
 
@@ -316,17 +318,37 @@ summary.iv_finite_factorial <- function(x, ...) {
 ##'
 ##' @title Tidy an iv_finite_factorial object
 ##' @param x An `iv_factorial` object produced by a call to
-##' [factiv::iv_finite_factorial()]
+##'   [factiv::iv_finite_factorial()]
 ##' @param conf.level The confidence level to use for the confidence
-##' interval. Must be strictly greater than 0 and less than 1.
-##' Defaults to  0.95, which corresponds to a 95
-##' percent confidence interval.
+##'   interval. Must be strictly greater than 0 and less than 1.
+##'   Defaults to 0.95, which corresponds to a 95 percent confidence
+##'   interval.
 ##' @param ... Additional arguments. Not used. Needed to match generic
-##' signature only.
-##' @return
+##'   signature only.
+##' @return A [tibble::tibble()] with columns:
+##'
+##'   \item{term}{The name of the effect term.}
+##'
+##'   \item{estimand}{Which complier effect being
+##'   estimated.}
+##'
+##'   \item{estimate}{The estimated value of the effect.}
+##' 
+##'   \item{ci_1_lower}{Lower bound for the first interval of the
+##'   Fieller confidence regresion for the estimate.}
+##' 
+##'   \item{ci_1_upper}{Upper bound for the first interval of the
+##'   Fieller confidence regresion for tshe estimate.}
+##' 
+##'   \item{ci_2_lower}{Lower bound for the second interval of the
+##'   Fieller confidence regresion for the estimate. Only non-`NA`
+##'   when the confidence region is disjoint.}
+##' \item{ci_2_upper}{Upper
+##'   bound for the second interval of the Fieller confidence
+##'   regresion for the estimate. Only non-`NA` when the confidence
+##'   region is disjoint.}
 ##' @author Matt Blackwell
 ##' @export
-
 tidy.iv_finite_factorial <- function(x, conf.level = 0.95, ...) {
 
   tms <- c(names(x$mcafe_est), names(x$pcafe_est))

@@ -21,7 +21,15 @@ percent confidence interval.}
 signature only.}
 }
 \value{
-
+A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
+\item{term}{The name of the effect term.}
+\item{estimand}{Which complier effect being estimated.}
+\item{estimate}{The estimated value of the effect.}
+\item{std.error}{The estimated standard error of the effect.}
+\item{conf.low}{Lower bound of the confidence interval for the
+estimate.}
+\item{conf.high}{Upper bound of the confidence interval for the
+estimate.}
 }
 \description{
 Tidy summarizes information about the components of a model.

@@ -488,7 +488,15 @@ print.summary.iv_factorial <- function(x, digits = max(3L, getOption("digits") -
 ##' percent confidence interval.
 ##' @param ... Additional arguments. Not used. Needed to match generic
 ##' signature only.
-##' @return
+##' @return A [tibble::tibble()] with columns:
+##' \item{term}{The name of the effect term.}
+##' \item{estimand}{Which complier effect being estimated.}
+##' \item{estimate}{The estimated value of the effect.}
+##' \item{std.error}{The estimated standard error of the effect.}
+##' \item{conf.low}{Lower bound of the confidence interval for the
+##' estimate.}
+##' \item{conf.high}{Upper bound of the confidence interval for the
+##' estimate.} 
 ##' @author Matt Blackwell
 ##' @export
 tidy.iv_factorial <- function(x, conf.int = FALSE, conf.level = 0.95, ...) {
@@ -512,3 +520,11 @@ tidy.iv_factorial <- function(x, conf.int = FALSE, conf.level = 0.95, ...) {
   }
   return(ret)
 }
+
+#' @importFrom utils globalVariables
+globalVariables(
+  c(
+    "estimate",
+    "std.error"
+  )
+)

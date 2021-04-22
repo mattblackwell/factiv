@@ -24,6 +24,11 @@
 #'   randomized to receive in-person canvassing.}
 #'  \item{phone_rand}{indicator variable for if the respondent was
 #'   randomized to receive phone canvassing.}
+#'  \item{age}{respondent age.}
+#'  \item{maj_party}{indicator variable for if the respondent is a
+#' registered Democrat or Republican.}
+#'  \item{turnout_96}{indicator variable for whether or not the
+#' respondent voted in the 1996 general election.}
 #' }
 #' @source https://doi.org/10.7910/DVN/Q6CID7
 #' @references Gerber, Alan S., and Donald P. Green. “The Effects of
