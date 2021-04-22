@@ -1,5 +1,45 @@
+##' Complier covariate profiles
+##'
+##' Calculates averages of covariates by compliance group in a
+##' 2^K factorial setting.
+##'
+##'  
+##' @param formula one-sided formula to indicate the treatment
+##'   assignment, treatment uptake, and covariates. The right-hand
+##'   side of the formula should have three components separated by
+##'   the `|` symbol, with the first component containing the K binary
+##'   treatment variables (treatment assignment), the second component
+##'   containing the K binary instruments associated with each
+##'   treatment variable (treatment uptake), and the third giving the
+##'   covariates to be included in the profile. The order of the
+##'   variables in the first two parts of the formula must match.
+##' @param data a data.frame on which to apply the `formula`.
+##' @param subset subset of the data to pass to estimation.
+##' @return A list with two objects:
+##' \item{raw_table}{a data.frame whose rows represent the covariates and
+##' whose columns represent the different compliance groups. Each
+##' entry is the estimated mean of the covariate for that compliance
+##' group. }
+##' \item{std_table}{a data.frame similarly structured to raw_table
+##' but with the standardized difference between the compilance group
+##' means and the overall means in place of the raw means.}
+##'
+##' @references
+##'
+##' Matthew Blackwell and Nicole Pashley (2021) "Noncompliance in
+##'   Factorial Experiments." Working paper.
+##'
+##' @author Matthew Blackwell
+##' @examples
+##'
+##' data(newhaven)
+##'
+##' cov_prof <- compliance_profile(~ inperson + phone | inperson_rand
+##'   + phone_rand | age + maj_party + turnout_96, data = newhaven)
+##'
+##' cov_prof
 ##' @export
-compliance_profile <- function(formula, data, subset, level = 0.95) {
+compliance_profile <- function(formula, data, subset) {
   cl <- match.call(expand.dots = TRUE)
   mf <- match.call(expand.dots = FALSE)
 
@@ -14,7 +54,6 @@ compliance_profile <- function(formula, data, subset, level = 0.95) {
 
   ## must be valid formula
   formula <- Formula::as.Formula(formula)
-  stopifnot(length(formula)[1] == 1L, length(formula)[2] %in% 1:3)
   if (inherits(try(terms(formula), silent = TRUE), "try-error")) {
     stop("cannot use dot '.' in formulas")
   }

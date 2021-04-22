@@ -35,7 +35,7 @@
 ##' @author Matt Blackwell
 ##' @references
 ##'
-##' Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
+##' Matthew Blackwell and Nicole Pashley (2021) "Noncompliance in
 ##'   Factorial Experiments." Working paper.
 ##'
 ##' @examples
