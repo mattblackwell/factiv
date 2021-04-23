@@ -1,0 +1,51 @@
+---
+title: "Introduction to factiv"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+bibliography: references.bib
+vignette: >
+  %\VignetteIndexEntry{Introduction to factiv}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, echo=FALSE}
+library(knitr)
+opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+# factiv: Noncompliance and Instrumental Variables in Factorial Experiments
+
+The factiv package allows analysts to address noncompliance in $2^K$ factorial experiments using instrumental variables methods. The package implements the methods of @BlaPas21. A $2^K$ factorial experiment randomly assigns units to $2^K$ possible treatment combinations of $K$ binary factors, and allows analysts to estimate the main and interactive effects of the factors, which we call factorial effects. 
+
+With noncompliance, the factorial effects of treatment uptake are not identified since noncompliance might be related to the outcomes. @BlaPas21 introduce a set of complier-average factorial effects that factiv is designed to estimate. 
+
+## What are factorial effects?
+
+In factorial experiments, several factors are being randomized at the same time. The `newhaven` data in the factiv package gives one example of such a factorial experiment involving a get-out-the-vote experiment where households were randomly assigned to receive (a) in-person canvassing or not, and (b) phone canvassing or not. Thus, in this experiment (which we call a 2x2 factorial design), there are four possible treatment assignments corresponding to the four combinations of the two binary treatments.
+
+```{r gotv_tab}
+library(factiv)
+data(newhaven)
+table(
+  `In-Person` = newhaven$inperson_rand,
+  `Phone` = newhaven$phone_rand
+)
+```
+
+In factorial experiments, there are two types of quantities of interest we may want to estimate: main effects and interactions. Main effects are defined as the effect of one factor, marginalizing over the assignment of the other factor. For the `newhaven` experiment in-person canvassing, this would be the average of the effect of in-person canvassing when assigned phone contact and the effect when assigned to no phone contact. An interaction is how the effect of a factor changes as a function of another factor. The in-person/phone interaction, then is the *difference* between the effect of in-person canvassing when assigned phone contact and the effect when not assigned to phone contact. These quantities of interest can be easily estimated using functions of sample means within each treatment combination. 
+
+## What is noncompliance?
+
+Noncompliance occurs when respondents don't take their assigned treatment. We say that treatment uptake differs from treatment assignment. We can see this in the `newhaven` experiment, with phone canvassing:
+
+```{r noncomp}
+table(
+  `Phone Assignment` = newhaven$phone_rand,
+  `Phone Uptake` = newhaven$phone
+)
+```
+
+Only `r sum(newhaven$phone)` of the `r sum(newhaven$phone_rand)` household assigned to the phone canvassing actually received the canvassing. Much of this noncompliance occurs because household do not answer their phones or hang up once they hear the call is a canvasser. Because the decision to comply (answer the phone) is likely correlated with the ultimate outcome, voting, we might worry that using treatment uptake might lead to biased estimates. 
+
+## References
