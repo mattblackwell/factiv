@@ -1,7 +1,9 @@
 ---
 title: "Introduction to factiv"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    keep_md: true
 bibliography: references.bib
 vignette: >
   %\VignetteIndexEntry{Introduction to factiv}
@@ -98,6 +100,18 @@ tidy(out_sp, conf.int = TRUE)
 
 Here, the confidence intervals are based on the usual large-sample variance estimates from the delta method and so will never be disjoint. 
 
+## Covariate profiling
 
+One downside to estimating complier effects is that we generally cannot identify which respondents are or are not part of each group. Fortunately, @BlaPas21 showed how to estimate profiles of the different complier groups in terms of covariate means. factiv can implement this approach in the `compliance_profile()` function. You can pass this function a similar formula to the estimation functions above, with additional third part separated by a `|` that indicates which covariates you would like to use in the profile:
+
+```{r compliance_profile}
+cov_prof <- compliance_profile(
+  ~ inperson + phone | inperson_rand + phone_rand |
+    age + maj_party + turnout_96,
+  data = newhaven)
+cov_prof
+```
+
+This function return a data frame with sample averages of each covariate within each marginal complier group and the perfect complier group (which is the group associated with the highest-order interaction). For example, in the `newhaven` output, we see that the marginal compliers for phone canvassing are roughly `r round(cov_prof$raw_table$phone[1], 1)` years old compare to `r round(cov_prof$raw_table$overall[1], 1)` in the sample overall. The `std_table` reports the relative difference between each group's mean and the overall mean (in terms of standard deviations of the overall sample). 
 
 ## References

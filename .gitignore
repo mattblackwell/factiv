@@ -1,4 +1,7 @@
 vignettes/.auto
+vignettes/*.html
+vignettes/*.md
+vignettes/*.R
 .Rproj.user
 .Rhistory
 doc
