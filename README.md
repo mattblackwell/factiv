@@ -9,7 +9,7 @@ To install the package, you can use the `remotes` package:
 
 There are two main functions in the package, `iv_factorial`, which  performs superpopulation-based inference, and `iv_finite_factorial`, which performs finite-population inference for the factorial effects using the Fieller method described in [Blackwell and Pashley (2020)][BP2020]. You can use these functions in the following manner:
 
-```{r}
+```r
 library(factiv)
 data(newhaven)
 

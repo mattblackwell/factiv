@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/index.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/compliance_profile.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/iv_factorial.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/iv_finite_factorial.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/newhaven.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/reexports.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/tidy.iv_factorial.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/reference/tidy.iv_finite_factorial.html</loc>
+  </url>
+  <url>
+    <loc>https://mattblackwell.github.io/factiv/articles/factiv.html</loc>
+  </url>
+</urlset>
