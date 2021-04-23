@@ -48,4 +48,56 @@ table(
 
 Only `r sum(newhaven$phone)` of the `r sum(newhaven$phone_rand)` household assigned to the phone canvassing actually received the canvassing. Much of this noncompliance occurs because household do not answer their phones or hang up once they hear the call is a canvasser. Because the decision to comply (answer the phone) is likely correlated with the ultimate outcome, voting, we might worry that using treatment uptake might lead to biased estimates. 
 
+## Complier effects in factorial experiments
+
+To overcome these issues, factiv takes an instrumental variables approach and focuses on estimating the factorial effect among *compliers*, or those respondents who would comply with their assigned treatment. @BlaPas21 identified two types of complier effects in the factorial setting: marginalized complier average factorial effects (MCAFEs) and perfect complier average factorial effects (PCAFE). These effects are simplest to understand for main effects:
+
+- **Main-effect MCAFEs**: the main effect of a factor effect among those who would comply with the factor, regardless of how they would comply on other factors. 
+- **Main-effect PCAFEs**: the main effect of a factor effect among those who would comply with **all** factors.
+
+For instance, in the `newhaven` data, the MCAFE for phone canvassing is the main factorial effect of (actual) phone canvassing among those who would pick up a phone call when called, regardless of how they would comply with in-person canvassing. The PCAFE would be the same effect for respondents who comply with both factors. 
+
+For interaction, we refer to the *active factors* as the set of factors being interacted. Then we can define our quantities for interactions:
+
+- **Interaction MCAFEs**: the interaction between factors among those who would comply with those active factors, regardless of how they would comply on other factors. 
+- **Interaction PCAFEs**: the interaction between factors among those who would comply with **all** factors.
+
+## Estimating complier effects with factiv
+
+factiv provides two ways of estimate the complier effects that differ in how they treat uncertainty. The first is a finite-population (or finite-sample) approach that treats outcomes as fixed and views treatment assignment as the only source of variation. 
+
+The `iv_finite_factorial()` function will provide these estimates, along with confidence intervals. To specify the model, you can provide a formula with two right-hand side parts separated by `|` that indicate the treatment uptake variables for each factor (on the left of `|`) and the treatment assignment variables for each factor (on the right of `|`). For the `newhaven` data, we have:
+
+```{r finite}
+out <- iv_finite_factorial(turnout_98 ~ inperson + phone | inperson_rand +
+                             phone_rand, data = newhaven)
+summary(out)
+```
+
+factiv also provides methods for accessing tidy versions of the output from its estimation function via the broom package. 
+
+```{r tidy}
+tidy(out)
+```
+
+In this tidy output, there are columns for 2 sets of confidence intervals. This is because the approach to confidence intervals we use, which we call the Fieller method, can sometimes produce disjoint (or infinite-length) confidence intervals if compliance is very low. 
+
+The second estimation approach factiv implements is based on a superpopulation approach to inference. In this setting, we consider our sample as a random sample from an infinite superpopulation and entertain variation from both treatment assignment and that sampling process. The `iv_factorial()` function implements this approach:
+
+```{r superpopulation}
+out_sp <- iv_factorial(turnout_98 ~ inperson + phone | inperson_rand +
+                      phone_rand, data = newhaven)
+summary(out_sp)
+```
+
+The superpopulation approach also has a tidy method:
+
+```{r sp_tidy}
+tidy(out_sp, conf.int = TRUE)
+```
+
+Here, the confidence intervals are based on the usual large-sample variance estimates from the delta method and so will never be disjoint. 
+
+
+
 ## References
