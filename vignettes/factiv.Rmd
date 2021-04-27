@@ -64,6 +64,8 @@ For interaction, we refer to the *active factors* as the set of factors being in
 - **Interaction MCAFEs**: the interaction between factors among those who would comply with those active factors, regardless of how they would comply on other factors. 
 - **Interaction PCAFEs**: the interaction between factors among those who would comply with **all** factors.
 
+Finally, we note that these interpretations of the  quantities of interest depend on several instrumental variable assumptions detailed in @BlaPas21. These include monotoncity of the effects and two exclusion restrictions. The first, the *outcome exclusion restriction*, requires treatment assignment to only affect the outcome through treatment uptake. The second, the *treatment exclusion restriction*, requires assignment of each factor to only affect the uptake on that factor and not any others. For more details on these assumptions and the interpretation of these quantities of interest when the assumptions do not hold, see @BlaPas21. 
+
 ## Estimating complier effects with factiv
 
 factiv provides two ways of estimating the complier effects that differ in how they treat uncertainty. The first is a finite-population (or finite-sample) approach that treats outcomes as fixed and views treatment assignment as the only source of variation. 
