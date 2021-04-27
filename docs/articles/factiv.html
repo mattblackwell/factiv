@@ -72,9 +72,9 @@
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Introduction to factiv</h1>
             
-            <h4 class="date">2021-04-23</h4>
+            <h4 class="date">2021-04-27</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mattblackwell/factiv/blob/master/R/vignettes/factiv.Rmd"><code>R/vignettes/factiv.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mattblackwell/factiv/blob/master/vignettes/factiv.Rmd"><code>vignettes/factiv.Rmd</code></a></small>
       <div class="hidden name"><code>factiv.Rmd</code></div>
 
     </div>
@@ -140,7 +140,7 @@
 <div id="estimating-complier-effects-with-factiv" class="section level2">
 <h2 class="hasAnchor">
 <a href="#estimating-complier-effects-with-factiv" class="anchor"></a>Estimating complier effects with factiv</h2>
-<p>factiv provides two ways of estimate the complier effects that differ in how they treat uncertainty. The first is a finite-population (or finite-sample) approach that treats outcomes as fixed and views treatment assignment as the only source of variation.</p>
+<p>factiv provides two ways of estimating the complier effects that differ in how they treat uncertainty. The first is a finite-population (or finite-sample) approach that treats outcomes as fixed and views treatment assignment as the only source of variation.</p>
 <p>The <code><a href="../reference/iv_finite_factorial.html">iv_finite_factorial()</a></code> function will provide these estimates, along with confidence intervals. To specify the model, you can provide a formula with two right-hand side parts separated by <code><a href="https://rdrr.io/r/base/Logic.html">|</a></code> that indicate the treatment uptake variables for each factor (on the left of <code><a href="https://rdrr.io/r/base/Logic.html">|</a></code>) and the treatment assignment variables for each factor (on the right of <code><a href="https://rdrr.io/r/base/Logic.html">|</a></code>). For the <code>newhaven</code> data, we have:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/iv_finite_factorial.html">iv_finite_factorial</a></span><span class="op">(</span><span class="va">turnout_98</span> <span class="op">~</span> <span class="va">inperson</span> <span class="op">+</span> <span class="va">phone</span> <span class="op">|</span> <span class="va">inperson_rand</span> <span class="op">+</span>
@@ -220,7 +220,7 @@
 ## 1        age 49.0173656 0.36819497 0.64083618    -0.01611632
 ## 2  maj_party  0.7298688 0.14530850 0.03874941    -0.23325020
 ## 3 turnout_96  0.4543350 0.07028004 0.32231383     0.48355935</code></pre>
-<p>This function return a data frame with sample averages of each covariate within each marginal complier group and the perfect complier group (which is the group associated with the highest-order interaction). For example, in the <code>newhaven</code> output, we see that the marginal compliers for phone canvassing are roughly 61.8 years old compare to 49 in the sample overall. The <code>std_table</code> reports the relative difference between each group’s mean and the overall mean (in terms of standard deviations of the overall sample).</p>
+<p>This function return a data frame with sample averages of each covariate within each marginal complier group and the perfect complier group (which is the group associated with the highest-order interaction). For example, in the <code>newhaven</code> output, we see that the marginal compliers for phone canvassing are estimated to be on average roughly 61.8 years old compare to 49 in the sample overall. The <code>std_table</code> reports the relative difference between each group’s mean and the overall mean (in terms of standard deviations of the overall sample).</p>
 </div>
 <div id="references" class="section level2 unnumbered">
 <h2 class="hasAnchor">
