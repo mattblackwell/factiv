@@ -60,7 +60,7 @@
 ##'   for Conditional Effects and Causal Interaction in Voter
 ##'   Mobilization Experiments, Journal of the American Statistical
 ##'   Association, 112:518, 590-599,
-##'   <https://doi.org/10.1080/01621459.2016.1246363>
+##'   \doi{10.1080/01621459.2016.1246363}
 ##'
 ##' Matthew Blackwell and Nicole Pashley (2020) "Noncompliance in
 ##'   Factorial Experiments." Working paper.
