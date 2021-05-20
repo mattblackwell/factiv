@@ -3,7 +3,7 @@ pkgdown: 1.6.1
 pkgdown_sha: ~
 articles:
   factiv: factiv.html
-last_built: 2021-04-27T18:00Z
+last_built: 2021-05-20T01:15Z
 urls:
   reference: https://mattblackwell.github.io/factiv/reference
   article: https://mattblackwell.github.io/factiv/articles
