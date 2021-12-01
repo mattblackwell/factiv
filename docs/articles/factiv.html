@@ -67,14 +67,14 @@
 
       
 
-      </header><script src="factiv_files/header-attrs-2.7/header-attrs.js"></script><div class="row">
+      </header><script src="factiv_files/header-attrs-2.8/header-attrs.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Introduction to factiv</h1>
             
-            <h4 class="date">2021-05-19</h4>
+            <h4 class="date">2021-12-01</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/mattblackwell/factiv/blob/master/../../../Dropbox/workland/classes/gov2002/grades/2021/vignettes/factiv.Rmd"><code>../../../Dropbox/workland/classes/gov2002/grades/2021/vignettes/factiv.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/mattblackwell/factiv/blob/master/vignettes/factiv.Rmd"><code>vignettes/factiv.Rmd</code></a></small>
       <div class="hidden name"><code>factiv.Rmd</code></div>
 
     </div>
@@ -164,7 +164,7 @@
 ## inperson:phone -0.1045  (-0.7908,  0.5747)</code></pre>
 <p>factiv also provides methods for accessing tidy versions of the output from its estimation function via the broom package.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/pkg/generics/man/tidy.html">tidy</a></span><span class="op">(</span><span class="va">out</span><span class="op">)</span></code></pre></div>
+<code class="sourceCode R"><span class="fu"><a href="https://generics.r-lib.org/reference/tidy.html">tidy</a></span><span class="op">(</span><span class="va">out</span><span class="op">)</span></code></pre></div>
 <pre><code>## # A tibble: 5 x 7
 ##   term           estimand estimate ci_1_lower ci_1_upper ci_2_lower ci_2_upper
 ## * &lt;chr&gt;          &lt;chr&gt;       &lt;dbl&gt;      &lt;dbl&gt;      &lt;dbl&gt;      &lt;dbl&gt;      &lt;dbl&gt;
@@ -189,7 +189,7 @@
 ## Estimated prob. of perfect compliers:  0.07969   SE =  0.02311</code></pre>
 <p>The superpopulation approach also has a tidy method:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/pkg/generics/man/tidy.html">tidy</a></span><span class="op">(</span><span class="va">out_sp</span>, conf.int <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></code></pre></div>
+<code class="sourceCode R"><span class="fu"><a href="https://generics.r-lib.org/reference/tidy.html">tidy</a></span><span class="op">(</span><span class="va">out_sp</span>, conf.int <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></code></pre></div>
 <pre><code>## # A tibble: 5 x 6
 ##   term           estimand estimate std.error conf.low conf.high
 ##   &lt;chr&gt;          &lt;chr&gt;       &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;     &lt;dbl&gt;
